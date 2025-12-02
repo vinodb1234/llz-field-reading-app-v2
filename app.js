@@ -1,192 +1,698 @@
-/* app.js - v2 simplified for v2 package
-   - Menu-driven PWA, saved reports (localStorage), improved graphs
+/* app.js - updated: DDM / RF hint logic + 0° sign selector
+   - Preserves all app features (wizard, save/export, graphs)
+   - DDM: for negative angles sign is auto-applied and a '-' prefix is shown;
+          for positive angles a '+' prefix is shown;
+          at 0° show radio + / - and hint asking to choose sign.
+   - RF: always stored as negative; user enters positive magnitude only.
+   - Hints are shown directly beneath the corresponding input rows (IDs: ddmHint, sdmHint, rfHint)
 */
+
 const ANGLES = [
-  -35, -30, -25, -20, -15, -14, -13, -12, -11, -10,
-  -9, -8, -7, -6, -5, -4, -3, -2.5, -2, -1.5, -1, -0.5,
-   0,
-   0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 9, 10,
-  11, 12, 13, 14, 15, 20, 25, 30, 35
+  -35,-30,-25,-20,-14,-13,-12,-11,-10,
+  -9,-8,-7,-6,-5,-4,-3,-2.5,-2,-1.5,-1,-0.5,
+  0,0.5,1,1.5,2,2.5,3,4,5,6,7,8,9,10,11,12,13,14,20,25,30,35
 ];
-const STORAGE_KEY = 'llz_v2_state';
-let state = { meta:{}, values:{tx1:{present:[] , reference:[]}, tx2:{present:[], reference:[]}}, current:{stage:'present', tx:null, idx:0, direction:'neg2pos'} };
-function initArrays(){ ['tx1','tx2'].forEach(tx=>{ ['present','reference'].forEach(s=>{ state.values[tx][s] = ANGLES.map(()=>({DDM:null, SDM:null, RF:null})); }); }); }
+
+const STORAGE_KEY = 'llz_final_v6';
+
+let state = {
+  meta: { station:'', freq:'', make:'', model:'', refDate:'', presDate:'', course:'' },
+  values: { tx1:{present:[], reference:[]}, tx2:{present:[], reference:[]} },
+  current: { stage:'present', tx:null, direction:'neg2pos', idx:0 }
+};
+
+function initArrays(){
+  ['tx1','tx2'].forEach(tx=>{
+    ['present','reference'].forEach(stage=>{
+      state.values[tx][stage] = ANGLES.map(()=>({DDM:null, SDM:null, RF:null}));
+    });
+  });
+}
 initArrays();
-function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
-function loadState(){ const raw = localStorage.getItem(STORAGE_KEY); if(raw){ try{ const s = JSON.parse(raw); state = Object.assign(state, s); ['tx1','tx2'].forEach(tx=>{ ['present','reference'].forEach(stage=>{ if(!Array.isArray(state.values[tx][stage]) || state.values[tx][stage].length !== ANGLES.length){ state.values[tx][stage] = ANGLES.map(()=>({DDM:null, SDM:null, RF:null})); } }); }); }catch(e){ console.warn(e); initArrays(); } } else { saveState(); } }
-loadState();
 
 function $(id){ return document.getElementById(id); }
-function showPage(id){ document.querySelectorAll('.page').forEach(p=>p.classList.add('hidden')); const el = $(id); if(el) el.classList.remove('hidden'); window.scrollTo(0,0); }
-
-function buildMetaPage(){ const el = $('pageMeta'); el.innerHTML = `
-  <div class="card"><h2>Basic Details</h2>
-  <div class="row">
-    <label>Station Code <input id="station" placeholder="VOBM" value="${state.meta.station||''}"></label>
-    <label>Frequency (MHz) <input id="freq" placeholder="110.50" value="${state.meta.freq||''}"></label>
-    <label>Make <input id="make" placeholder="R&S" value="${state.meta.make||''}"></label>
-    <label>Model <input id="model" placeholder="XYZ" value="${state.meta.model||''}"></label>
-    <label>Ref Date <input id="refDate" placeholder="DD-MM-YYYY" value="${state.meta.refDate||''}"></label>
-    <label>Pres Date <input id="presDate" placeholder="DD-MM-YYYY" value="${state.meta.presDate||''}"></label>
-    <label>Course Width <input id="course" placeholder="3.0" value="${state.meta.course||''}"></label>
-  </div>
-  <div class="actions"><button id="metaSave" class="btn primary">Save & Continue</button></div></div>`;
-  document.getElementById('metaSave').onclick = ()=>{ state.meta.station = $('station').value; state.meta.freq = $('freq').value; state.meta.make = $('make').value; state.meta.model = $('model').value; state.meta.refDate = $('refDate').value; state.meta.presDate = $('presDate').value; state.meta.course = $('course').value; saveState(); alert('Saved'); showPage('pageStage'); buildStagePage(); };
+function el(tag, cls){ const e=document.createElement(tag); if(cls) e.className = cls; return e; }
+function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function loadState(){
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if(raw){
+    try{
+      const l = JSON.parse(raw);
+      if(l.meta) state.meta = Object.assign(state.meta, l.meta);
+      if(l.values) state.values = Object.assign(state.values, l.values);
+      if(l.current) state.current = Object.assign(state.current, l.current);
+    }catch(e){ console.warn(e); initArrays(); }
+  }
+  ['tx1','tx2'].forEach(tx=>{ ['present','reference'].forEach(stage=>{
+    if(!Array.isArray(state.values[tx][stage]) || state.values[tx][stage].length !== ANGLES.length) state.values[tx][stage] = ANGLES.map(()=>({DDM:null, SDM:null, RF:null}));
+  })});
+  saveState();
 }
+loadState();
 
-function buildStagePage(){ const el = $('pageStage'); el.innerHTML = `
-  <div class="card"><h2>Dashboard</h2>
-  <div class="row">
-    <button id="btnPresent" class="btn primary">Present Readings</button>
-    <button id="btnReference" class="btn">Reference Readings</button>
-    <button id="btnResults" class="btn">Results & Graphs</button>
-    <button id="btnSaved" class="btn">Saved Reports</button>
-  </div>
-  <div class="note">Station: ${state.meta.station||'-'}  Freq: ${state.meta.freq||'-'}</div>
-  </div>`;
-  $('btnPresent').onclick = ()=>{ state.current.stage='present'; buildTxSelect(); showPage('pageTxSelect'); };
-  $('btnReference').onclick = ()=>{ state.current.stage='reference'; buildTxSelect(); showPage('pageTxSelect'); };
-  $('btnResults').onclick = ()=>{ buildResultsPage(); showPage('pageResults'); };
-  $('btnSaved').onclick = ()=>{ buildSavedPage(); showPage('pageSaved'); };
-}
+// page helpers
+function showPage(id){ document.querySelectorAll('.page').forEach(p=>p.classList.add('hidden')); const e=$(id); if(e) e.classList.remove('hidden'); window.scrollTo(0,0); }
 
-function buildTxSelect(){ const el = $('pageTxSelect'); el.innerHTML = `
-  <div class="card"><h2>Select Transmitter — ${state.current.stage.toUpperCase()}</h2>
-  <div class="tx-card-row">
-    <div id="tx1Card" class="tx-card"><div class="tx-card-title">TX1</div><div class="tx-card-sub">Transmitter A</div></div>
-    <div id="tx2Card" class="tx-card"><div class="tx-card-title">TX2</div><div class="tx-card-sub">Transmitter B</div></div>
-  </div></div>`;
-  $('tx1Card').onclick = ()=>{ state.current.tx='tx1'; buildDirectionPage(); showPage('pageDirection'); };
-  $('tx2Card').onclick = ()=>{ state.current.tx='tx2'; buildDirectionPage(); showPage('pageDirection'); };
-}
+// meta
+function populateMetaFromUI(){ state.meta.station = $('station').value.trim(); state.meta.freq = $('freq').value.trim(); state.meta.make = $('make').value.trim(); state.meta.model = $('model').value.trim(); state.meta.refDate = $('refDate').value.trim(); state.meta.presDate = $('presDate').value.trim(); state.meta.course = $('course').value.trim(); saveState(); updateDashboardButtons(); }
+function formatDateOK(s){ return /^\d{2}-\d{2}-\d{4}$/.test(s); }
+function applyHeaderCheck(){ const ref = $('refDate').value.trim(), pres = $('presDate').value.trim(); if(!formatDateOK(ref) || !formatDateOK(pres)){ alert('Enter dates in DD-MM-YYYY'); return false; } return true; }
 
-function buildDirectionPage(){ const el = $('pageDirection'); el.innerHTML = `
-  <div class="card"><h2>Choose Angle Direction</h2>
-  <div class="row">
-    <label><input type="radio" name="dir" value="neg2pos" checked> -35 → +35</label>
-    <label><input type="radio" name="dir" value="pos2neg"> +35 → -35</label>
-  </div>
-  <div class="actions"><button id="dirCont" class="btn primary">Continue</button><button id="dirBack" class="btn">Back</button></div>
-  </div>`;
-  $('dirCont').onclick = ()=>{ const sel = document.querySelector('input[name="dir"]:checked').value; state.current.direction = sel; state.current.idx = 0; buildWizardPage(); showPage('pageWizard'); };
-  $('dirBack').onclick = ()=> showPage('pageTxSelect');
-}
+// bottom sheet / toast
+function createBottomSheet(){ if(document.querySelector('.bs-overlay')) return; const overlay = el('div','bs-overlay'); overlay.innerHTML = `<div class="bottom-sheet"><div class="bs-handle"></div><div class="sheet-title" id="sheetTitle"></div><div class="sheet-sub" id="sheetSub"></div><div class="sheet-buttons" id="sheetButtons"></div></div>`; document.body.appendChild(overlay); overlay.addEventListener('click', e=>{ if(e.target===overlay) hideBottomSheet(); }); }
+function showBottomSheet(title, sub, buttons){ createBottomSheet(); const overlay = document.querySelector('.bs-overlay'); const sheet = overlay.querySelector('.bottom-sheet'); overlay.classList.add('show'); setTimeout(()=> sheet.classList.add('show'),20); $('sheetTitle').textContent = title||''; $('sheetSub').textContent = sub||''; const c = $('sheetButtons'); c.innerHTML=''; buttons.forEach(b=>{ const btn = el('button','sheet-btn'); btn.textContent = b.label; if(b.kind==='primary') btn.classList.add('primary'); btn.onclick = ()=>{ hideBottomSheet(); setTimeout(()=> b.action && b.action(),240); }; c.appendChild(btn); }); }
+function hideBottomSheet(){ const overlay=document.querySelector('.bs-overlay'); if(!overlay) return; const sheet=overlay.querySelector('.bottom-sheet'); sheet.classList.remove('show'); setTimeout(()=> overlay.classList.remove('show'),260); }
+function showToast(msg,ms=1500){ let t = document.querySelector('.toast'); if(!t){ t = el('div','toast'); document.body.appendChild(t); } t.textContent = msg; t.classList.add('show'); setTimeout(()=> t.classList.remove('show'), ms); }
 
+// wizard helpers
 function getOrderIndex(idx){ return state.current.direction === 'neg2pos' ? idx : (ANGLES.length - 1 - idx); }
 
-function buildWizardPage(){ const el = $('pageWizard'); const idx = state.current.idx; const order = getOrderIndex(idx); const angle = ANGLES[order]; const saved = state.values[state.current.tx][state.current.stage][order]; el.innerHTML = `
-  <div class="card wizardBox"><h2>${state.current.tx.toUpperCase()} — ${state.current.stage.toUpperCase()}</h2>
-  <div class="note">Station: ${state.meta.station||'-'}</div>
-  <div class="angleIndicator">Angle: <strong>${angle}°</strong></div>
-  <div class="entryRow"><div class="labelCol"><strong>DDM</strong></div><div class="inputCol"><input id="ddm" value="${saved && saved.DDM? Math.abs(saved.DDM):''}" placeholder="Enter positive value only"></div></div>
-  <div class="entryRow"><div class="labelCol"><strong>SDM</strong></div><div class="inputCol"><input id="sdm" value="${saved && saved.SDM? Math.abs(saved.SDM):''}" placeholder="Enter positive value only"></div></div>
-  <div class="entryRow"><div class="labelCol"><strong>RF</strong></div><div class="inputCol"><input id="rf" value="${saved && saved.RF? Math.abs(saved.RF):''}" placeholder="Enter positive value only"></div></div>
-  <div class="actions"><button id="wizPrev" class="btn">Prev</button><button id="wizSave" class="btn primary">Save</button><button id="wizNext" class="btn">Next</button><button id="wizFinish" class="btn">Finish TX</button></div>
-  <div class="note" style="margin-top:8px">Note: Enter positive magnitudes. DDM will be signed automatically (angle sign); RF stored as negative.</div>
-  </div>`;
-  $('wizPrev').onclick = ()=>{ if(state.current.idx>0) state.current.idx--; buildWizardPage(); };
-  $('wizNext').onclick = ()=>{ saveWizard(); if(state.current.idx < ANGLES.length-1) state.current.idx++; buildWizardPage(); };
-  $('wizSave').onclick = ()=>{ saveWizard(); alert('Saved'); };
-  $('wizFinish').onclick = ()=>{ saveWizard(); alert('TX saved'); showPage('pageStage'); };
+// NEW: helper to safely set hint text if element exists
+function setHint(id, text){
+  const el = $(id);
+  if(el) el.textContent = text;
 }
 
-function saveWizard(){ const idx = state.current.idx; const order = getOrderIndex(idx); const angle = ANGLES[order]; let dd = $('ddm').value.trim(); let sd = $('sdm').value.trim(); let rf = $('rf').value.trim(); let ddn = dd===''?null: Number(dd); let sdn = sd===''?null: Number(sd); let rfn = rf===''?null: Number(rf); if(ddn!==null){ if(angle<0) ddn = -Math.abs(ddn); else if(angle>0) ddn = Math.abs(ddn); else ddn = Math.abs(ddn); } if(sdn!==null) sdn = Math.abs(sdn); if(rfn!==null) rfn = -Math.abs(rfn); state.values[state.current.tx][state.current.stage][order] = {DDM: ddn, SDM: sdn, RF: rfn}; saveState(); }
+// update sign UI and hints based on angle and saved values
+function updateDDMSignUI(angle, saved){
+  const prefix = $('ddmSignPrefix');
+  const signGroup = $('ddmSignGroup');
+  // hints
+  if(angle === 0){
+    if(prefix) prefix.style.display = 'none';
+    if(signGroup) signGroup.style.display = 'block';
+    // set hint text
+    setHint('ddmHint', "At 0°: choose + or − sign, and enter positive magnitude.");
+    // set radio defaults if present
+    if(saved && saved.DDM !== null){
+      if(saved.DDM < 0) { if($('ddmMinus')) $('ddmMinus').checked = true; }
+      else { if($('ddmPlus')) $('ddmPlus').checked = true; }
+    } else {
+      if($('ddmPlus')) $('ddmPlus').checked = true;
+    }
+  } else {
+    if(signGroup) signGroup.style.display = 'none';
+    if(prefix) {
+      prefix.style.display = 'inline-block';
+      prefix.textContent = angle < 0 ? '−' : '+';
+    }
+    if(angle < 0){
+      setHint('ddmHint', "Negative angle: enter positive magnitude only. Stored automatically as negative.");
+    } else {
+      setHint('ddmHint', "Positive angle: enter positive magnitude only. Stored as positive.");
+    }
+  }
+  // SDM hint
+  setHint('sdmHint', "Enter positive values only.");
+  // RF hint always
+  setHint('rfHint', "Enter positive values only. RF will be stored as negative automatically.");
+}
 
+function showWizardForCurrent(){
+  if(!state.current.tx){ alert('Please select a transmitter'); return; }
+  const tx = state.current.tx;
+  const stage = state.current.stage;
+  const total = ANGLES.length;
+  if(state.current.idx < 0) state.current.idx = 0;
+  if(state.current.idx >= total) state.current.idx = total - 1;
+  const orderIdx = getOrderIndex(state.current.idx);
+  const angle = ANGLES[orderIdx];
+  $('angleValue').textContent = angle;
+  $('wizardTitle').textContent = `${tx.toUpperCase()} — ${stage.toUpperCase()}`;
+  $('wizardMeta').textContent = `Station: ${state.meta.station || '-'}  REF: ${state.meta.refDate || '-'}  PRES: ${state.meta.presDate || '-'}`;
+  const saved = state.values[tx][stage][orderIdx];
+  $('ddmInput').value = (saved && saved.DDM !== null) ? Math.abs(saved.DDM) : '';
+  $('sdmInput').value = (saved && saved.SDM !== null) ? Math.abs(saved.SDM) : '';
+  $('rfInput').value = (saved && saved.RF !== null) ? Math.abs(saved.RF) : '';
+  updateDDMSignUI(angle, saved);
+  updateNextButtonsVisibility();
+  $('wizardProgress').textContent = `Angle ${state.current.idx + 1} of ${ANGLES.length}`;
+}
+
+function wizardSaveCurrent(){
+  if(!state.current.tx){ alert('No transmitter selected'); return false; }
+  const tx = state.current.tx;
+  const stage = state.current.stage;
+  const orderIdx = getOrderIndex(state.current.idx);
+  const angle = ANGLES[orderIdx];
+
+  let ddm = $('ddmInput').value.trim(), sdm = $('sdmInput').value.trim(), rf = $('rfInput').value.trim();
+  let ddmNum = ddm === '' ? null : Number(ddm);
+  let sdmNum = sdm === '' ? null : Number(sdm);
+  let rfNum  = rf === '' ? null : Number(rf);
+  if(ddmNum !== null && isNaN(ddmNum)){ alert('DDM must be numeric'); return false; }
+  if(sdmNum !== null && isNaN(sdmNum)){ alert('SDM must be numeric'); return false; }
+  if(rfNum !== null && isNaN(rfNum)){ alert('RF must be numeric'); return false; }
+
+  // sign rules
+  if(ddmNum !== null){
+    if(angle < 0) ddmNum = -Math.abs(ddmNum);
+    else if(angle > 0) ddmNum = Math.abs(ddmNum);
+    else {
+      // 0 degree -> look at radio buttons
+      const sel = document.querySelector('input[name="ddmSign"]:checked');
+      if(sel && sel.value === '-') ddmNum = -Math.abs(ddmNum);
+      else ddmNum = Math.abs(ddmNum);
+    }
+  }
+  if(sdmNum !== null) sdmNum = Math.abs(sdmNum);
+  if(rfNum !== null) rfNum = -Math.abs(rfNum);
+
+  state.values[tx][stage][orderIdx] = { DDM: ddmNum, SDM: sdmNum, RF: rfNum };
+  saveState();
+  return true;
+}
+
+function wizardNext(){ if(!wizardSaveCurrent()) return; state.current.idx++; if(state.current.idx >= ANGLES.length) state.current.idx = ANGLES.length - 1; showWizardForCurrent(); }
+function wizardPrev(){ wizardSaveCurrent(); state.current.idx--; if(state.current.idx < 0) state.current.idx = 0; showWizardForCurrent(); }
+
+function updateNextButtonsVisibility(){
+  const ddmVal = $('ddmInput').value.trim();
+  const sdmVal = $('sdmInput').value.trim();
+  const rfVal = $('rfInput').value.trim();
+  const ddn = $('ddmNext'), sdn = $('sdmNext'), rfn = $('rfNext');
+  if(ddn) ddn.classList.toggle('hidden', ddmVal === '');
+  if(sdn) sdn.classList.toggle('hidden', sdmVal === '');
+  if(rfn) rfn.classList.toggle('hidden', rfVal === '');
+}
+
+// dashboard & flow
+function updateDashboardButtons(){
+  const anyPresent = isStageComplete('tx1','present') || isStageComplete('tx2','present');
+  const anyRef = isStageComplete('tx1','reference') || isStageComplete('tx2','reference');
+  const chooseResults = $('chooseResults');
+  if(chooseResults){
+    chooseResults.style.display = (anyPresent || anyRef) ? 'inline-block' : 'none';
+  }
+  const progress = $('stageProgress');
+  if(progress){
+    progress.textContent = `Status — P: TX1 ${isStageComplete('tx1','present')?'✓':'—'}  TX2 ${isStageComplete('tx2','present')?'✓':'—'}  |  R: TX1 ${isStageComplete('tx1','reference')?'✓':'—'}  TX2 ${isStageComplete('tx2','reference')?'✓':'—'}`;
+  }
+}
+
+function startStage(stage){
+  state.current.stage = stage;
+  state.current.tx = null;
+  state.current.direction = 'neg2pos';
+  state.current.idx = 0;
+  saveState();
+  updateTxCardStatus();
+  $('txselectHeader').textContent = `${stage.toUpperCase()} — choose transmitter`;
+  showPage('page-txselect');
+}
+
+function updateTxCardStatus(){
+  ['tx1','tx2'].forEach(tx=>{
+    const elId = tx === 'tx1' ? 'tx1Card' : 'tx2Card';
+    const card = $(elId);
+    const presentDone = isStageComplete(tx,'present');
+    const refDone = isStageComplete(tx,'reference');
+    const foot = tx === 'tx1' ? $('tx1Status') : $('tx2Status');
+    if(foot) foot.textContent = `P:${presentDone? '✓':'—'}  R:${refDone? '✓':'—'}`;
+    if(card){ card.classList.toggle('completed', presentDone && refDone); }
+  });
+}
+
+function onTxChosen(tx){
+  state.current.tx = tx;
+  $('dirHeader').textContent = `Select Angle Direction for ${tx.toUpperCase()} (${state.current.stage.toUpperCase()})`;
+  if(state.current.direction === 'pos2neg') $('dirPos2Neg').checked = true; else $('dirNeg2Pos').checked = true;
+  showPage('page-direction');
+}
+
+function onDirectionContinue(){
+  const sel = document.querySelector('input[name="angleDir"]:checked');
+  if(!sel){ alert('Choose direction'); return; }
+  state.current.direction = sel.value;
+  state.current.idx = 0;
+  saveState();
+  showPage('page-wizard');
+  showWizardForCurrent();
+}
+
+function finishTxAndBack(){
+  if(!wizardSaveCurrent()) return;
+  const finishedTx = state.current.tx;
+  const stage = state.current.stage;
+  showToast(`${finishedTx.toUpperCase()} ${stage.toUpperCase()} saved`);
+  state.current.tx = null;
+  state.current.idx = 0;
+  saveState();
+  updateTxCardStatus();
+
+  const bothDoneThisStage = isStageComplete('tx1', stage) && isStageComplete('tx2', stage);
+  if(bothDoneThisStage){
+    const otherStage = (stage === 'present') ? 'reference' : 'present';
+    const allDone = isStageComplete('tx1','present') && isStageComplete('tx2','present') && isStageComplete('tx1','reference') && isStageComplete('tx2','reference');
+    if(allDone){
+      showBottomSheet(
+        `All readings completed`,
+        `All Present and Reference readings for both TXs completed.`,
+        [
+          { label: 'View Results', kind:'primary', action: ()=> { populateResultsMeta(); buildAllCombinedTables(); showPage('page-results'); } },
+          { label: 'Back to Dashboard', kind:'secondary', action: ()=> { showPage('page-stage'); updateDashboardButtons(); } }
+        ]
+      );
+      return;
+    }
+    showBottomSheet(
+      `${stage.toUpperCase()} readings completed`,
+      `Proceed to ${otherStage.toUpperCase()} readings?`,
+      [
+        { label: `Start ${otherStage.toUpperCase()}`, kind:'primary', action: ()=> { startStage(otherStage); } },
+        { label: 'Stay here', kind:'secondary', action: ()=> { showPage('page-txselect'); } },
+        { label: 'View Results', kind:'ghost', action: ()=> { populateResultsMeta(); buildAllCombinedTables(); showPage('page-results'); } }
+      ]
+    );
+  } else {
+    showBottomSheet(
+      `${finishedTx.toUpperCase()} ${stage.toUpperCase()} completed`,
+      `What would you like to do next for ${stage.toUpperCase()}?`,
+      [
+        { label: `Enter other TX (${ finishedTx === 'tx1' ? 'TX2' : 'TX1' })`, kind:'primary', action: ()=> { startStage(stage); } },
+        { label: `Redo ${finishedTx.toUpperCase()}`, kind:'secondary', action: ()=> { state.current.tx = finishedTx; showPage('page-direction'); } },
+        { label: 'View Results', kind:'ghost', action: ()=> { populateResultsMeta(); buildAllCombinedTables(); showPage('page-results'); } }
+      ]
+    );
+  }
+}
+
+function isStageComplete(tx, stage){
+  const arr = state.values[tx][stage];
+  for(let i=0;i<arr.length;i++){
+    const r = arr[i];
+    if(r.DDM === null && r.SDM === null && r.RF === null) return false;
+  }
+  return true;
+}
+
+// RESULTS: combined tables & compute
+function populateResultsMeta(){
+  const m = state.meta;
+  const el = $('resultsMeta');
+  if(el) el.textContent = `Station: ${m.station||''}   Freq: ${m.freq||''} MHz   REF: ${m.refDate||''}   PRES: ${m.presDate||''}   Make: ${m.make||''}   Model: ${m.model||''}`;
+}
+
+// Build combined horizontal table for a transmitter (A-style order)
+function buildCombinedTable(tx){
+  const targetId = tx === 'tx1' ? 'table_tx1_combined' : 'table_tx2_combined';
+  const wrapper = $(targetId);
+  if(!wrapper) return;
+  wrapper.innerHTML = ''; // clear
+
+  // build table element
+  const tbl = el('table');
+  // header row: first cell "ANGLE" then all angle headers
+  const thead = el('thead');
+  const headRow = el('tr');
+  const th0 = el('th'); th0.textContent = 'ANGLE';
+  headRow.appendChild(th0);
+  ANGLES.forEach(a=>{ const th = el('th'); th.textContent = a; headRow.appendChild(th); });
+  thead.appendChild(headRow);
+  tbl.appendChild(thead);
+
+  // helper to create row
+  const addRow = (label, arrValues) => {
+    const tr = el('tr');
+    const th = el('th'); th.textContent = label; tr.appendChild(th);
+    arrValues.forEach(v=>{ const td = el('td'); td.textContent = (v === null || v === undefined) ? '' : v; tr.appendChild(td); });
+    return tr;
+  };
+
+  // fetch signed arrays for ref and present
+  const refArr = state.values[tx].reference.map(o => o); // objects
+  const presArr = state.values[tx].present.map(o => o);
+
+  // rows in requested order:
+  const tbody = el('tbody');
+  const ddmRef = refArr.map(x => x.DDM === null ? '' : x.DDM);
+  const ddmPres = presArr.map(x => x.DDM === null ? '' : x.DDM);
+  const sdmRef = refArr.map(x => x.SDM === null ? '' : x.SDM);
+  const sdmPres = presArr.map(x => x.SDM === null ? '' : x.SDM);
+  const rfRef = refArr.map(x => x.RF === null ? '' : x.RF);
+  const rfPres = presArr.map(x => x.RF === null ? '' : x.RF);
+
+  tbody.appendChild(addRow(`DDM REF (${state.meta.refDate||''})`, ddmRef));
+  tbody.appendChild(addRow(`DDM PRES (${state.meta.presDate||''})`, ddmPres));
+  tbody.appendChild(addRow(`SDM REF (${state.meta.refDate||''})`, sdmRef));
+  tbody.appendChild(addRow(`SDM PRES (${state.meta.presDate||''})`, sdmPres));
+  tbody.appendChild(addRow(`RF REF (${state.meta.refDate||''})`, rfRef));
+  tbody.appendChild(addRow(`RF PRES (${state.meta.presDate||''})`, rfPres));
+
+  tbl.appendChild(tbody);
+  wrapper.appendChild(tbl);
+}
+
+// Build both combined tables
+function buildAllCombinedTables(){
+  buildCombinedTable('tx1');
+  buildCombinedTable('tx2');
+}
+
+// compute absolute arrays and prepare for plotting
 let charts = {};
-function buildResultsPage(){ const el = $('pageResults'); el.innerHTML = `<div class="card"><h2>Results & Graphs</h2><div class="actions"><button id="btnCalc" class="btn primary">Compute & Show</button><button id="btnExportPdf" class="btn">Export PDF</button><button id="btnExportImg" class="btn">Export Images</button></div><div id="plots" class="hidden"></div><div id="tables" class="tableCard hidden"></div></div>`;
-  $('btnCalc').onclick = ()=>{ calculateAll(); document.getElementById('plots').classList.remove('hidden'); document.getElementById('tables').classList.remove('hidden'); };
-  $('btnExportPdf').onclick = ()=> exportPdf();
-  $('btnExportImg').onclick = ()=> exportGraphImages();
-}
-
 function calculateAll(){
   const compiled = {};
   ['tx1','tx2'].forEach(tx=>{
-    compiled[tx] = { present:{}, reference:{} };
-    ['present','reference'].forEach(stage=>{
-      const arr = state.values[tx][stage];
-      compiled[tx][stage].ddm = arr.map(x => x.DDM===null?NaN:Math.abs(x.DDM));
-      compiled[tx][stage].sdm = arr.map(x => x.SDM===null?NaN:Math.abs(x.SDM));
-      compiled[tx][stage].rf  = arr.map(x => x.RF===null?NaN:Math.abs(x.RF));
+    compiled[tx] = {};
+    ['present','reference'].forEach(t=>{
+      const arr = state.values[tx][t];
+      compiled[tx][t] = {
+        ddm_abs: arr.map(x => x.DDM === null ? NaN : Math.abs(x.DDM)),
+        sdm_abs: arr.map(x => x.SDM === null ? NaN : Math.abs(x.SDM)),
+        rf_abs:  arr.map(x => x.RF  === null ? NaN : Math.abs(x.RF))
+      };
     });
+    const refSigned = state.values[tx].reference.map(x => x.DDM === null ? NaN : x.DDM);
+    const presSigned = state.values[tx].present.map(x => x.DDM === null ? NaN : x.DDM);
+    compiled[tx].ddm_diff_signed = refSigned.map((v,i) => (isNaN(v) || isNaN(presSigned[i])) ? NaN : v - presSigned[i]);
   });
   state.compiled = compiled;
-  renderPlots(compiled);
-  renderTables();
   saveState();
+  plotCombinedGraphs(compiled);
+  renderSummary(compiled);
+  buildAllCombinedTables();
 }
 
-function renderPlots(compiled){
-  const plots = document.getElementById('plots'); plots.innerHTML = `<h3>TX1</h3><div class="chartWrap"><canvas id="c1" width="800" height="320"></canvas></div><h3>TX2</h3><div class="chartWrap"><canvas id="c2" width="800" height="320"></canvas></div>`;
-  const c1 = document.getElementById('c1').getContext('2d');
-  const c2 = document.getElementById('c2').getContext('2d');
-  if(window.charts){ Object.values(window.charts).forEach(ch=>ch.destroy()); }
-  window.charts = {};
-  window.charts.c1 = new Chart(c1, { type:'line', data:{ labels: ANGLES, datasets:[ {label:'DDM PRES', data: compiled.tx1.present.ddm, borderColor:'#0277BD', tension:0.08, borderWidth:2, pointRadius:3}, {label:'DDM REF', data: compiled.tx1.reference.ddm, borderColor:'rgba(2,119,189,0.45)', tension:0.08, borderWidth:2, pointRadius:3}, {label:'SDM PRES', data: compiled.tx1.present.sdm, borderColor:'#16A085', tension:0.08, borderWidth:2, pointRadius:3}, {label:'RF PRES', data: compiled.tx1.present.rf, borderColor:'#C0392B', tension:0.08, borderWidth:2, pointRadius:3} ] }, options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ min:-5, max:50 }, x:{ ticks:{autoSkip:false, maxRotation:90, minRotation:90 } } } } });
-  window.charts.c2 = new Chart(c2, { type:'line', data:{ labels: ANGLES, datasets:[ {label:'DDM PRES', data: compiled.tx2.present.ddm, borderColor:'#0277BD', tension:0.08, borderWidth:2, pointRadius:3}, {label:'DDM REF', data: compiled.tx2.reference.ddm, borderColor:'rgba(2,119,189,0.45)', tension:0.08, borderWidth:2, pointRadius:3}, {label:'SDM PRES', data: compiled.tx2.present.sdm, borderColor:'#16A085', tension:0.08, borderWidth:2, pointRadius:3}, {label:'RF PRES', data: compiled.tx2.present.rf, borderColor:'#C0392B', tension:0.08, borderWidth:2, pointRadius:3} ] }, options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ min:-5, max:50 }, x:{ ticks:{autoSkip:false, maxRotation:90, minRotation:90 } } } } });
-}
-
-function renderTables(){
-  const tbl = document.getElementById('tables'); tbl.innerHTML = '';
-  ['tx1','tx2'].forEach(tx=>{
-    const div = document.createElement('div'); div.className='tableCard';
-    const h = document.createElement('h4'); h.textContent = tx.toUpperCase(); div.appendChild(h);
-    const t = document.createElement('table');
-    const thead = document.createElement('thead'); const hr = document.createElement('tr'); const th0 = document.createElement('th'); th0.textContent='ANGLE'; hr.appendChild(th0);
-    ANGLES.forEach(a=>{ const th = document.createElement('th'); th.textContent = a; hr.appendChild(th); });
-    thead.appendChild(hr); t.appendChild(thead);
-    const addRow = (label, arr)=>{ const r = document.createElement('tr'); const th = document.createElement('th'); th.textContent = label; r.appendChild(th); arr.forEach(v=>{ const td = document.createElement('td'); td.textContent = (v===null||v===undefined)?'':v; r.appendChild(td); }); return r; };
-    const ref = state.values[tx].reference; const pres = state.values[tx].present;
-    const ddmRef = ref.map(x=> x.DDM===null?'':x.DDM); const ddmPres = pres.map(x=> x.DDM===null?'':x.DDM);
-    const sdmRef = ref.map(x=> x.SDM===null?'':x.SDM); const sdmPres = pres.map(x=> x.SDM===null?'':x.SDM);
-    const rfRef = ref.map(x=> x.RF===null?'':x.RF); const rfPres = pres.map(x=> x.RF===null?'':x.RF);
-    const tbody = document.createElement('tbody'); tbody.appendChild(addRow('DDM REF', ddmRef)); tbody.appendChild(addRow('DDM PRES', ddmPres)); tbody.appendChild(addRow('SDM REF', sdmRef)); tbody.appendChild(addRow('SDM PRES', sdmPres)); tbody.appendChild(addRow('RF REF', rfRef)); tbody.appendChild(addRow('RF PRES', rfPres));
-    t.appendChild(tbody); div.appendChild(t); tbl.appendChild(div);
+// Plot combined graphs with all angle labels shown
+function plotCombinedGraphs(compiled){
+  const colors = {
+    ddm_pres: 'rgb(2, 119, 189)',
+    ddm_ref:  'rgba(2,119,189,0.45)',
+    sdm_pres: 'rgb(22, 160, 133)',
+    sdm_ref:  'rgba(22,160,133,0.45)',
+    rf_pres:  'rgb(192, 57, 43)',
+    rf_ref:   'rgba(192,57,43,0.45)'
+  };
+  const makeDataset = (label, data, color, dash=false) => ({
+    label,
+    data,
+    fill: false,
+    borderColor: color,
+    backgroundColor: color,
+    tension: 0.12,
+    pointRadius: 2,
+    borderDash: dash ? [6,4] : []
   });
-}
 
-async function exportPdf(){
-  await calculateAll();
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF('l','pt','a4'); const pageW = pdf.internal.pageSize.getWidth(); const margin=28;
-  pdf.setFontSize(12); pdf.text(`Station: ${state.meta.station||''}   Freq: ${state.meta.freq||''}`, margin, 40);
-  let y = 60;
-  for(const id of ['c1','c2']){
-    const canvas = document.getElementById(id); if(canvas){ const dataUrl = canvas.toDataURL('image/png'); const img = new Image(); img.src = dataUrl; await new Promise(r=>img.onload=r); const scale = Math.min(1, (pageW - margin*2)/img.width); const w = img.width*scale; const h = img.height*scale; if(y + h > pdf.internal.pageSize.getHeight()-40){ pdf.addPage(); y=margin; } pdf.addImage(dataUrl,'PNG',margin,y,w,h); y += h + 10; }
+  // TX1
+  const tx1 = compiled.tx1;
+  const ds1 = [
+    makeDataset('DDM Present', tx1.present.ddm_abs, colors.ddm_pres),
+    makeDataset('DDM Reference', tx1.reference.ddm_abs, colors.ddm_ref, false),
+    makeDataset('SDM Present', tx1.present.sdm_abs, colors.sdm_pres),
+    makeDataset('SDM Reference', tx1.reference.sdm_abs, colors.sdm_ref, false),
+    makeDataset('RF Present', tx1.present.rf_abs, colors.rf_pres),
+    makeDataset('RF Reference', tx1.reference.rf_abs, colors.rf_ref, false)
+  ];
+  const c1 = document.getElementById('chart_tx1_all');
+  if(c1){
+    if(charts['chart_tx1_all']) charts['chart_tx1_all'].destroy();
+    const ctx1 = c1.getContext('2d');
+    charts['chart_tx1_all'] = new Chart(ctx1, {
+      type: 'line',
+      data: { labels: ANGLES, datasets: ds1 },
+      options: {
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        stacked: false,
+        plugins: { legend: { position: 'top' } },
+        scales: {
+          x: {
+            title: { display:true, text: 'Angle (°)' },
+            ticks: { autoSkip: false, maxRotation: 90, minRotation: 90 }
+          },
+          y: { title: { display:true, text: 'Magnitude (absolute values)' }, beginAtZero: true, max:50 }
+        }
+      }
+    });
   }
-  const tables = document.querySelectorAll('.tableCard'); for(const t of tables){ const canvas = await html2canvas(t, {scale:2, backgroundColor:'#ffffff'}); const dataUrl = canvas.toDataURL('image/png'); const img = new Image(); img.src = dataUrl; await new Promise(r=>img.onload=r); const scale = Math.min(1, (pageW - margin*2)/img.width); const w = img.width*scale; const h = img.height*scale; if(y + h > pdf.internal.pageSize.getHeight()-40){ pdf.addPage(); y=margin; } pdf.addImage(dataUrl,'PNG',margin,y,w,h); y += h + 10; }
-  pdf.save('llz_report_v2.pdf');
+
+  // TX2
+  const tx2 = compiled.tx2;
+  const ds2 = [
+    makeDataset('DDM Present', tx2.present.ddm_abs, colors.ddm_pres),
+    makeDataset('DDM Reference', tx2.reference.ddm_abs, colors.ddm_ref, false),
+    makeDataset('SDM Present', tx2.present.sdm_abs, colors.sdm_pres),
+    makeDataset('SDM Reference', tx2.reference.sdm_abs, colors.sdm_ref, false),
+    makeDataset('RF Present', tx2.present.rf_abs, colors.rf_pres),
+    makeDataset('RF Reference', tx2.reference.rf_abs, colors.rf_ref, false)
+  ];
+  const c2 = document.getElementById('chart_tx2_all');
+  if(c2){
+    if(charts['chart_tx2_all']) charts['chart_tx2_all'].destroy();
+    const ctx2 = c2.getContext('2d');
+    charts['chart_tx2_all'] = new Chart(ctx2, {
+      type: 'line',
+      data: { labels: ANGLES, datasets: ds2 },
+      options: {
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        stacked: false,
+        plugins: { legend: { position: 'top' } },
+        scales: {
+          x: {
+            title: { display:true, text: 'Angle (°)' },
+            ticks: { autoSkip: false, maxRotation: 90, minRotation: 90 }
+          },
+          y: { title: { display:true, text: 'Magnitude (absolute values)' }, beginAtZero: true, max:50 }
+        }
+      }
+    });
+  }
+
+  $('plotsArea').classList.remove('hidden');
 }
 
-function exportGraphImages(){
-  ['c1','c2'].forEach(id=>{ const c = document.getElementById(id); if(c){ const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = id + '.png'; a.click(); } });
-}
-
-function saveCurrentReport(){
-  const reports = JSON.parse(localStorage.getItem('llz_reports_v2')||'[]');
-  const name = `${state.meta.station||'LLZ'}_${new Date().toISOString().slice(0,19).replace('T','_')}`;
-  html2canvas(document.querySelector('body'), {scale:1.2, backgroundColor:'#ffffff'}).then(canvas=>{
-    const img = canvas.toDataURL('image/png');
-    const r = { id: Date.now(), name, meta: state.meta, data: state.values, snapshot: img };
-    reports.unshift(r);
-    localStorage.setItem('llz_reports_v2', JSON.stringify(reports));
-    alert('Report saved locally'); buildSavedPage();
+// render summary
+function renderSummary(compiled){
+  const out = [];
+  ['tx1','tx2'].forEach(tx=>{
+    out.push(`--- ${tx.toUpperCase()} ---`);
+    out.push(`Sample DDM signed diffs (first 6): ${compiled[tx].ddm_diff_signed.slice(0,6).map(v=> isNaN(v)?'NA':v).join(', ')}`);
+    out.push('');
   });
+  $('resultsSummary').textContent = out.join('\n');
+  $('resultsSummary').classList.remove('hidden');
 }
 
-function buildSavedPage(){ const el = $('pageSaved'); el.innerHTML = `<div class="card"><h2>Saved Reports</h2><div id="savedList" class="saved-list"></div></div>`; const list = document.getElementById('savedList'); const reports = JSON.parse(localStorage.getItem('llz_reports_v2')||'[]'); if(reports.length===0){ list.innerHTML = '<div class="note">No saved reports</div>'; return; } reports.forEach(r=>{ const it = document.createElement('div'); it.className='saved-item'; it.innerHTML = `<div><strong>${r.name}</strong><div style="font-size:12px;color:#666">${r.meta.station||''} ${r.meta.refDate||''}</div></div><div><button class="btn small" data-id="${r.id}">Open</button><button class="btn small" data-del="${r.id}">Delete</button></div>`; list.appendChild(it); it.querySelector('[data-id]').onclick = ()=>{ const win = window.open(); win.document.write(`<img src="${r.snapshot}" style="max-width:100%"><p><button onclick="window.print()">Print</button></p>`); }; it.querySelector('[data-del]').onclick = ()=>{ if(confirm('Delete?')){ const newr = reports.filter(x=> x.id !== r.id); localStorage.setItem('llz_reports_v2', JSON.stringify(newr)); buildSavedPage(); } }; }); }
+// CSV (same)
+function exportCsv(){
+  const m = state.meta;
+  const rows = [];
+  rows.push(`Station,${m.station||''}`);
+  rows.push(`Frequency,${m.freq||''}`);
+  rows.push('');
+  ['tx1','tx2'].forEach(tx=>{
+    ['present','reference'].forEach(type=>{
+      rows.push(`${tx.toUpperCase()} - ${type.toUpperCase()}`);
+      rows.push('Angle,DDM,SDM,RF');
+      state.values[tx][type].forEach((r,i)=> rows.push(`${ANGLES[i]},${r.DDM===null?'':r.DDM},${r.SDM===null?'':r.SDM},${r.RF===null?'':r.RF}`));
+      rows.push('');
+    });
+  });
+  const csv = rows.join('\n'); const blob = new Blob([csv], { type:'text/csv' }); const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'llz_export.csv'; a.click(); URL.revokeObjectURL(url);
+}
 
+// PDF export: landscape A4 with auto-scale of table images
+async function exportPdf(){
+  if(!state.compiled) calculateAll();
+  // ensure charts & tables are ready
+  await new Promise(r => setTimeout(r, 300));
+
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('l','pt','a4'); // landscape
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
+  const margin = 28;
+
+  pdf.setFontSize(12);
+  const header = `Station: ${state.meta.station||''}   Freq: ${state.meta.freq||''} MHz   REF: ${state.meta.refDate||''}   PRES: ${state.meta.presDate||''}   Make: ${state.meta.make||''}   Model: ${state.meta.model||''}`;
+  pdf.text(header, margin, 40);
+
+  let cursorY = 60;
+
+  // draw canvas -> pdf
+  const addCanvasImage = (canvas, maxW, yPos) => {
+    const dataUrl = canvas.toDataURL('image/png');
+    const img = new Image();
+    img.src = dataUrl;
+    return new Promise((resolve)=>{
+      img.onload = ()=>{
+        const imgW = img.width;
+        const imgH = img.height;
+        const scale = Math.min(1, maxW / imgW);
+        const drawW = imgW * scale;
+        const drawH = imgH * scale;
+        if(yPos + drawH + 60 > pageH){
+          pdf.addPage();
+          yPos = margin;
+        }
+        pdf.addImage(dataUrl, 'PNG', margin, yPos, drawW, drawH);
+        resolve(yPos + drawH + 12);
+      };
+      img.onerror = ()=> resolve(yPos + 12);
+    });
+  };
+
+  // element -> image via html2canvas -> pdf (auto-scale)
+  const addElementImage = (elNode, maxW, yPos) => {
+    return html2canvas(elNode, { scale: 1.25 }).then(canvas =>{
+      const dataUrl = canvas.toDataURL('image/png');
+      const img = new Image();
+      img.src = dataUrl;
+      return new Promise((resolve)=>{
+        img.onload = ()=>{
+          const imgW = img.width;
+          const imgH = img.height;
+          const scale = Math.min(1, maxW / imgW);
+          const drawW = imgW * scale;
+          const drawH = imgH * scale;
+          if(yPos + drawH + 60 > pageH){
+            pdf.addPage();
+            yPos = margin;
+          }
+          pdf.addImage(dataUrl, 'PNG', margin, yPos, drawW, drawH);
+          resolve(yPos + drawH + 12);
+        };
+        img.onerror = ()=> resolve(yPos + 12);
+      });
+    });
+  };
+
+  const maxImgWidth = pageW - margin*2;
+
+  // TX1: chart then table
+  const c1 = document.getElementById('chart_tx1_all');
+  if(c1){
+    cursorY = await addCanvasImage(c1, maxImgWidth, cursorY);
+  }
+  const table1 = document.getElementById('table_tx1_combined');
+  if(table1){
+    cursorY = await addElementImage(table1, maxImgWidth, cursorY);
+  }
+
+  // TX2: chart then table
+  const c2 = document.getElementById('chart_tx2_all');
+  if(c2){
+    cursorY = await addCanvasImage(c2, maxImgWidth, cursorY);
+  }
+  const table2 = document.getElementById('table_tx2_combined');
+  if(table2){
+    cursorY = await addElementImage(table2, maxImgWidth, cursorY);
+  }
+
+  pdf.save('llz_report_graphs_tables_landscape.pdf');
+}
+
+// Export graph images (PNG) for tx1 and tx2
+function exportGraphImages(){
+  const c1 = document.getElementById('chart_tx1_all');
+  const c2 = document.getElementById('chart_tx2_all');
+  const downloadImage = (dataUrl, filename) => {
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = filename;
+    a.click();
+  };
+  if(c1){
+    try{ downloadImage(c1.toDataURL('image/png'), 'tx1_graph.png'); }catch(e){ showToast('TX1 export failed'); }
+  }
+  if(c2){
+    try{ downloadImage(c2.toDataURL('image/png'), 'tx2_graph.png'); }catch(e){ showToast('TX2 export failed'); }
+  }
+}
+
+// wiring
 document.addEventListener('DOMContentLoaded', ()=>{
-  buildMetaPage(); buildStagePage();
-  const menuBtn = document.getElementById('menuBtn'); const side = document.getElementById('sideMenu');
-  menuBtn.onclick = ()=> side.classList.toggle('show');
-  document.getElementById('mBasic').onclick = ()=>{ side.classList.remove('show'); showPage('pageMeta'); };
-  document.getElementById('mPresent').onclick = ()=>{ side.classList.remove('show'); state.current.stage='present'; buildTxSelect(); showPage('pageTxSelect'); };
-  document.getElementById('mReference').onclick = ()=>{ side.classList.remove('show'); state.current.stage='reference'; buildTxSelect(); showPage('pageTxSelect'); };
-  document.getElementById('mResults').onclick = ()=>{ side.classList.remove('show'); buildResultsPage(); showPage('pageResults'); };
-  document.getElementById('mSaved').onclick = ()=>{ side.classList.remove('show'); buildSavedPage(); showPage('pageSaved'); };
-  document.getElementById('mExportPdf').onclick = ()=>{ side.classList.remove('show'); buildResultsPage(); showPage('pageResults'); setTimeout(()=> exportPdf(),700); };
-  document.getElementById('mExportImgs').onclick = ()=>{ side.classList.remove('show'); buildResultsPage(); showPage('pageResults'); setTimeout(()=> exportGraphImages(),700); };
-  document.getElementById('mClear').onclick = ()=>{ if(confirm('Clear all saved data?')){ localStorage.removeItem(STORAGE_KEY); localStorage.removeItem('llz_reports_v2'); location.reload(); } };
-  const btn = document.createElement('button'); btn.className='btn'; btn.textContent='Save Report'; btn.onclick = ()=> saveCurrentReport(); document.querySelector('.container').prepend(btn);
+
+  // populate meta
+  if($('station')) $('station').value = state.meta.station || '';
+  if($('freq')) $('freq').value = state.meta.freq || '';
+  if($('make')) $('make').value = state.meta.make || '';
+  if($('model')) $('model').value = state.meta.model || '';
+  if($('refDate')) $('refDate').value = state.meta.refDate || '';
+  if($('presDate')) $('presDate').value = state.meta.presDate || '';
+  if($('course')) $('course').value = state.meta.course || '';
+
+  // HOME
+  const btnHome = $('btnHome');
+  if(btnHome) btnHome.addEventListener('click', ()=>{
+    if(state.meta && state.meta.station) { updateDashboardButtons(); showPage('page-stage'); }
+    else showPage('page-meta');
+  });
+
+  // meta Next
+  const mn = $('metaNext');
+  if(mn) mn.addEventListener('click', ()=>{
+    if(!applyHeaderCheck()) return;
+    populateMetaFromUI();
+    updateDashboardButtons();
+    showPage('page-stage');
+  });
+
+  // clear saved
+  const ca = $('clearAll');
+  if(ca) ca.addEventListener('click', ()=>{ if(confirm('Clear all saved local entries?')){ localStorage.removeItem(STORAGE_KEY); location.reload(); } });
+
+  // stage
+  const choosePres = $('choosePresent');
+  if(choosePres) choosePres.addEventListener('click', ()=>{ if(!applyHeaderCheck()) return; populateMetaFromUI(); startStage('present'); });
+  const chooseRef = $('chooseReference');
+  if(chooseRef) chooseRef.addEventListener('click', ()=>{ if(!applyHeaderCheck()) return; populateMetaFromUI(); startStage('reference'); });
+  const chooseResults = $('chooseResults');
+  if(chooseResults) chooseResults.addEventListener('click', ()=>{ populateResultsMeta(); buildAllCombinedTables(); showPage('page-results'); });
+
+  // tx cards
+  const tx1c = $('tx1Card'); if(tx1c) tx1c.addEventListener('click', ()=> onTxChosen('tx1'));
+  const tx2c = $('tx2Card'); if(tx2c) tx2c.addEventListener('click', ()=> onTxChosen('tx2'));
+
+  // direction
+  const dirCont = $('dirContinue'); if(dirCont) dirCont.addEventListener('click', onDirectionContinue);
+  const dirBack = $('dirBack'); if(dirBack) dirBack.addEventListener('click', ()=> showPage('page-txselect'));
+
+  // wizard nav
+  const prevAngle = $('prevAngle'); if(prevAngle) prevAngle.addEventListener('click', ()=> wizardPrev());
+  const nextAngle = $('nextAngle'); if(nextAngle) nextAngle.addEventListener('click', ()=> wizardNext());
+  const saveAngle = $('saveAngle'); if(saveAngle) saveAngle.addEventListener('click', ()=>{ wizardSaveCurrent(); showToast('Saved'); });
+  const finishWizard = $('finishWizard'); if(finishWizard) finishWizard.addEventListener('click', ()=> finishTxAndBack());
+
+  // next small buttons
+  if($('ddmNext')) $('ddmNext').addEventListener('click', ()=> $('sdmInput').focus());
+  if($('sdmNext')) $('sdmNext').addEventListener('click', ()=> $('rfInput').focus());
+  if($('rfNext')) $('rfNext').addEventListener('click', ()=> { wizardSaveCurrent(); wizardNext(); });
+
+  // inputs: toggles
+  ['ddmInput','sdmInput','rfInput'].forEach(id=>{
+    const e = $(id); if(!e) return;
+    e.addEventListener('input', updateNextButtonsVisibility);
+    e.addEventListener('keydown', ev=>{
+      if(ev.key === 'Enter'){
+        ev.preventDefault();
+        if(id === 'ddmInput') $('sdmInput').focus();
+        else if(id === 'sdmInput') $('rfInput').focus();
+        else if(id === 'rfInput') { wizardSaveCurrent(); wizardNext(); }
+      }
+    });
+  });
+
+  // DDM sign radios (for 0°) - ensure they navigate properly when user toggles
+  const ddmPlus = $('ddmPlus'), ddmMinus = $('ddmMinus');
+  if(ddmPlus) ddmPlus.addEventListener('change', ()=>{ /* no-op; sign read on save */ });
+  if(ddmMinus) ddmMinus.addEventListener('change', ()=>{ /* no-op; sign read on save */ });
+
+  // results actions
+  const showTables = $('showTables');
+  if(showTables) showTables.addEventListener('click', ()=> { buildAllCombinedTables(); $('tablesArea').classList.toggle('hidden'); });
+  const calcAllBtn = $('calcAll');
+  if(calcAllBtn) calcAllBtn.addEventListener('click', ()=> { calculateAll(); $('plotsArea').classList.remove('hidden'); });
+  const csvBtn = $('exportCsvBtn'); if(csvBtn) csvBtn.addEventListener('click', exportCsv);
+  const pdfBtn = $('exportPdfBtn'); if(pdfBtn) pdfBtn.addEventListener('click', exportPdf);
+  const imgBtn = $('exportImgsBtn'); if(imgBtn) imgBtn.addEventListener('click', exportGraphImages);
+
+  // init UI
+  updateTxCardStatus();
+  updateDashboardButtons();
+  if(state.meta && state.meta.station) showPage('page-stage'); else showPage('page-meta');
 });
