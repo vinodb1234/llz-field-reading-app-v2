@@ -1,116 +1,53 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>LLZ Field Reading App</title>
-
-    <!-- Styles -->
-    <link rel="stylesheet" href="styles.css" />
-
-    <!-- PWA manifest -->
-    <link rel="manifest" href="manifest.json">
-
-    <!-- Icons -->
-    <link rel="icon" type="image/png" href="icons/icon-192.png" />
-
-    <!-- iOS PWA -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>LLZ Field Reading App</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="styles.css">
 </head>
-
 <body>
-
-    <!-- ================== TOP BAR ================== -->
-    <div class="topbar">
-        <div style="display:flex; align-items:center; justify-content:space-between;">
-            <div style="display:flex; align-items:center; gap:10px;">
-                <button id="menuButton" class="menu-btn">☰</button>
-                <div class="title">LLZ Field Reading App</div>
-            </div>
-            <div class="subtitle">Developed by B. Vinod, Manager (CNS)</div>
-        </div>
+  <div class="topbar">
+    <div class="topbar-row container">
+      <button class="menu-btn" id="menuBtn">☰</button>
+      <div class="title">LLZ Field Reading App</div>
+      <div class="subtitle">Developed by B. Vinod, Manager (CNS)</div>
     </div>
+  </div>
 
-    <!-- ================== SIDE MENU ================== -->
-    <div id="sideMenu" class="side-menu">
-        <div class="menu-header">Menu</div>
-
-        <div class="menu-list">
-            <button onclick="showPage('pageMeta')">Basic Details</button>
-            <button onclick="showPage('pageStage')">Present / Reference</button>
-            <button onclick="showPage('pageSaved')">Saved Reports</button>
-            <button onclick="showPage('pageResults')">Results & Graphs</button>
-        </div>
-
-        <div class="menu-footer">Version 2.1</div>
+  <div id="sideMenu" class="side-menu" aria-hidden="true">
+    <div class="menu-header">LLZ Field Reading App</div>
+    <div class="menu-list">
+      <button id="mBasic">Basic Details</button>
+      <button id="mPresent">Present Readings</button>
+      <button id="mReference">Reference Readings</button>
+      <button id="mResults">Graphs & Tables</button>
+      <button id="mSaved">Saved Reports</button>
+      <button id="mExportPdf">Export PDF</button>
+      <button id="mExportImgs">Export Images</button>
+      <button id="mClear">Clear All Data</button>
     </div>
+    <div class="menu-footer">Developed by B. Vinod, Manager (CNS)</div>
+  </div>
 
-    <!-- ================== MAIN PAGES ================== -->
+  <!-- Pages -->
+  <div id="pageMeta" class="page container"></div>
+  <div id="pageStage" class="page container hidden"></div>
+  <div id="pageTxSelect" class="page container hidden"></div>
+  <div id="pageDirection" class="page container hidden"></div>
+  <div id="pageWizard" class="page container hidden"></div>
+  <div id="pageResults" class="page container hidden"></div>
+  <div id="pageSaved" class="page container hidden"></div>
 
-    <!-- 1) BASIC DETAILS PAGE -->
-    <div id="pageMeta" class="page container">
-        <!-- JS will populate this page -->
-    </div>
-
-    <!-- 2) PRESENT/REFERENCE STAGE PAGE -->
-    <div id="pageStage" class="page container hidden">
-        <!-- JS will populate -->
-    </div>
-
-    <!-- 3) TX SELECT PAGE -->
-    <div id="pageTxSelect" class="page container hidden"></div>
-
-    <!-- 4) DIRECTION PAGE -->
-    <div id="pageDirection" class="page container hidden"></div>
-
-    <!-- 5) WIZARD PAGE -->
-    <div id="pageWizard" class="page container hidden"></div>
-
-    <!-- 6) RESULTS PAGE -->
-    <div id="pageResults" class="page container hidden"></div>
-
-    <!-- 7) SAVED REPORTS -->
-    <div id="pageSaved" class="page container hidden"></div>
-
-    <!-- ================== TOAST ================== -->
-    <div class="toast" id="toastBox"></div>
-
-    <!-- ================== SCRIPTS ================== -->
-
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-    <!-- html2canvas for PDF screenshots -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-
-    <!-- jsPDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
-    <!-- Main App Logic -->
-    <script src="app.js"></script>
-
-    <!-- Service Worker -->
-    <script>
-        if ("serviceWorker" in navigator) {
-            navigator.serviceWorker.register("service-worker.js");
-        }
-    </script>
-
-    <!-- MENU SCRIPT -->
-    <script>
-        const btn = document.getElementById("menuButton");
-        const menu = document.getElementById("sideMenu");
-
-        btn.addEventListener("click", () => {
-            menu.classList.toggle("show");
-        });
-
-        document.body.addEventListener("click", (e) => {
-            if (!menu.contains(e.target) && e.target !== btn) {
-                menu.classList.remove("show");
-            }
-        });
-    </script>
-
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="app.js"></script>
+  <script>
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.register('service-worker.js').catch(()=>console.log('SW reg failed'));
+    }
+  </script>
 </body>
 </html>
