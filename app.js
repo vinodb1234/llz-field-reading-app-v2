@@ -1,12 +1,14 @@
-/* =====================================================================
-   LLZ FIELD READING APP – FINAL COMPLETE VERSION
-   FIXES INCLUDED:
-   ✔ NEXT not moving → FIXED
-   ✔ Bigger input boxes
-   ✔ Extra spacing
+/* ============================================================================
+   LLZ FIELD READING APP – FINAL FULL VERSION (WITH ALL FIXES)
+   Author: B. Vinod
+   Features:
+   ✔ NEXT bug fixed
+   ✔ Enter/Arrow navigation
+   ✔ Bigger input boxes + more spacing
    ✔ Notes under DDM & RF
-   ✔ Graphs + Excel export
-   ===================================================================== */
+   ✔ Graphs + Excel + Image export
+   ✔ All angles preserved (-35…35)
+============================================================================ */
 
 const ANGLES = [
   -35, -30, -25, -20, -15, -14, -13, -12, -11, -10,
@@ -27,7 +29,7 @@ let state = {
   current: { stage: "present", tx: null, idx: 0, direction: "neg2pos" }
 };
 
-/* -------------------- INITIALISE ARRAYS -------------------- */
+/* -------------------- INITIALIZE ARRAYS -------------------- */
 function initArrays() {
   ["tx1", "tx2"].forEach(tx => {
     ["present", "reference"].forEach(st => {
@@ -36,8 +38,6 @@ function initArrays() {
   });
 }
 initArrays();
-
-/* -------------------- SAVE / LOAD -------------------- */
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -56,7 +56,6 @@ function loadState() {
 }
 loadState();
 
-/* -------------------- HELPERS -------------------- */
 function $(id) { return document.getElementById(id); }
 
 function showPage(id) {
@@ -65,9 +64,9 @@ function showPage(id) {
   window.scrollTo(0, 0);
 }
 
-/* =======================================================================
+/* ============================================================================
    BASIC DETAILS PAGE
-   ======================================================================= */
+============================================================================ */
 function buildMetaPage() {
   $("pageMeta").innerHTML = `
     <div class="card"><h2>Basic Details</h2>
@@ -88,23 +87,24 @@ function buildMetaPage() {
   `;
 
   $("metaSave").onclick = () => {
-    state.meta.station = $("station").value;
-    state.meta.freq = $("freq").value;
-    state.meta.make = $("make").value;
-    state.meta.model = $("model").value;
-    state.meta.refDate = $("refDate").value;
-    state.meta.presDate = $("presDate").value;
-    state.meta.course = $("course").value;
-
+    state.meta = {
+      station: $("station").value,
+      freq: $("freq").value,
+      make: $("make").value,
+      model: $("model").value,
+      refDate: $("refDate").value,
+      presDate: $("presDate").value,
+      course: $("course").value
+    };
     saveState();
     showPage("pageStage");
     buildStagePage();
   };
 }
 
-/* =======================================================================
-   PAGE: STAGE
-   ======================================================================= */
+/* ============================================================================
+   DASHBOARD PAGE
+============================================================================ */
 function buildStagePage() {
   $("pageStage").innerHTML = `
     <div class="card"><h2>Dashboard</h2>
@@ -114,7 +114,6 @@ function buildStagePage() {
         <button id="btnResults" class="btn">Graphs & Tables</button>
         <button id="btnSaved" class="btn">Saved Reports</button>
       </div>
-
       <div class="note">Station: ${state.meta.station || '-'} | Freq: ${state.meta.freq || '-'}</div>
     </div>
   `;
@@ -125,9 +124,9 @@ function buildStagePage() {
   $("btnSaved").onclick = () => { buildSavedPage(); showPage("pageSaved"); };
 }
 
-/* =======================================================================
-   PAGE: TX SELECT
-   ======================================================================= */
+/* ============================================================================
+   TX SELECT
+============================================================================ */
 function buildTxSelect() {
   $("pageTxSelect").innerHTML = `
     <div class="card"><h2>Select Transmitter (${state.current.stage.toUpperCase()})</h2>
@@ -142,9 +141,9 @@ function buildTxSelect() {
   $("tx2Card").onclick = () => { state.current.tx = "tx2"; buildDirectionPage(); showPage("pageDirection"); };
 }
 
-/* =======================================================================
-   PAGE: ANGLE DIRECTION
-   ======================================================================= */
+/* ============================================================================
+   ANGLE DIRECTION
+============================================================================ */
 function buildDirectionPage() {
   $("pageDirection").innerHTML = `
     <div class="card"><h2>Select Angle Direction</h2>
@@ -168,14 +167,13 @@ function buildDirectionPage() {
   $("dirBack").onclick = () => showPage("pageTxSelect");
 }
 
-/* -------------------- HELPER -------------------- */
 function getOrderIndex(i) {
   return state.current.direction === "neg2pos" ? i : ANGLES.length - 1 - i;
 }
 
-/* =======================================================================
-   PAGE: WIZARD (DATA ENTRY)
-   ======================================================================= */
+/* ============================================================================
+   WIZARD (DATA ENTRY) WITH NAVIGATION
+============================================================================ */
 
 function buildWizardPage() {
   const idx = state.current.idx;
@@ -184,38 +182,34 @@ function buildWizardPage() {
   const saved = state.values[state.current.tx][state.current.stage][order];
 
   $("pageWizard").innerHTML = `
-    <div class="card wizardBox" style="padding:18px">
+    <div class="card wizardBox" style="padding:20px">
 
       <h2>${state.current.tx.toUpperCase()} – ${state.current.stage.toUpperCase()}</h2>
-      <div class="note" style="margin-bottom:16px;">Angle: <strong>${angle}°</strong></div>
+      <div class="note" style="margin-bottom:18px;">Angle: <strong>${angle}°</strong></div>
 
-      <!-- DDM -->
-      <div style="margin-bottom:20px;">
+      <div style="margin-bottom:22px;">
         <label style="font-weight:600;">DDM</label><br>
-        <input id="ddm" style="width:220px;padding:12px;font-size:20px;"
-          value="${saved.DDM !== null ? Math.abs(saved.DDM) : ''}" 
-          placeholder="Enter +ve value">
-        <div class="note">Enter positive value only. System applies sign automatically for negative angles.</div>
+        <input id="ddm" class="wizInput" style="width:240px;padding:14px;font-size:20px;"
+          value="${saved.DDM !== null ? Math.abs(saved.DDM) : ''}" placeholder="Enter +ve value">
+        <div class="note">Enter positive value — sign applied automatically for negative angles.</div>
       </div>
 
-      <!-- SDM -->
-      <div style="margin-bottom:20px;">
+      <div style="margin-bottom:22px;">
         <label style="font-weight:600;">SDM</label><br>
-        <input id="sdm" style="width:220px;padding:12px;font-size:20px;"
-          value="${saved.SDM !== null ? Math.abs(saved.SDM) : ''}" 
-          placeholder="Enter +ve value">
+        <input id="sdm" class="wizInput" style="width:240px;padding:14px;font-size:20px;"
+          value="${saved.SDM !== null ? Math.abs(saved.SDM) : ''}" placeholder="Enter +ve value">
       </div>
 
-      <!-- RF -->
-      <div style="margin-bottom:20px;">
+      <div style="margin-bottom:22px;">
         <label style="font-weight:600;">RF</label><br>
-        <input id="rf" style="width:220px;padding:12px;font-size:20px;"
-          value="${saved.RF !== null ? Math.abs(saved.RF) : ''}" 
-          placeholder="Enter +ve value">
-        <div class="note">Enter positive value only — system stores RF as negative.</div>
+        <input id="rf" class="wizInput" style="width:240px;padding:14px;font-size:20px;"
+          value="${saved.RF !== null ? Math.abs(saved.RF) : ''}" placeholder="Enter +ve value">
+        <div class="note">Enter positive value — stored as negative automatically.</div>
       </div>
 
-      <div class="actions" style="margin-top:25px;">
+      <button id="quickNext" class="btn primary" style="font-size:18px;">⮞ Next Angle</button>
+
+      <div class="actions" style="margin-top:20px;">
         <button id="wizPrev" class="btn">Prev</button>
         <button id="wizSave" class="btn primary">Save</button>
         <button id="wizNext" class="btn">Next</button>
@@ -226,7 +220,7 @@ function buildWizardPage() {
   `;
 
   $("wizPrev").onclick = () => {
-    if (state.current.idx > 0) {
+    if (idx > 0) {
       state.current.idx--;
       buildWizardPage();
     }
@@ -234,29 +228,48 @@ function buildWizardPage() {
 
   $("wizSave").onclick = () => { saveWizard(); alert("Saved"); };
 
-  $("wizNext").onclick = () => {
+  $("wizNext").onclick = () => moveNext();
+  $("quickNext").onclick = () => moveNext();
+
+  $("wizFinish").onclick = () => { saveWizard(); showPage("pageStage"); };
+
+  const ddm = $("ddm");
+  const sdm = $("sdm");
+  const rf  = $("rf");
+
+  ddm.onkeydown = (e) => {
+    if (["Enter","ArrowDown","ArrowRight"].includes(e.key)) sdm.focus();
+  };
+
+  sdm.onkeydown = (e) => {
+    if (["Enter","ArrowDown","ArrowRight"].includes(e.key)) rf.focus();
+  };
+
+  rf.onkeydown = (e) => {
+    if (e.key === "Enter" || e.key === "ArrowRight") moveNext();
+  };
+
+  function moveNext() {
     saveWizard();
     if (state.current.idx < ANGLES.length - 1) {
       state.current.idx++;
       buildWizardPage();
     }
-  };
-
-  $("wizFinish").onclick = () => {
-    saveWizard();
-    showPage("pageStage");
-  };
+  }
 }
 
-/* -------------------- SAVE WIZARD ENTRY -------------------- */
+/* ============================================================================
+   SAVE WIZARD ENTRY
+============================================================================ */
+
 function saveWizard() {
   const idx = state.current.idx;
   const order = getOrderIndex(idx);
   const angle = ANGLES[order];
 
-  let dd = Number($("#ddm").value.trim());
-  let sd = Number($("#sdm").value.trim());
-  let rf = Number($("#rf").value.trim());
+  let dd = Number($("ddm").value.trim());
+  let sd = Number($("sdm").value.trim());
+  let rf = Number($("rf").value.trim());
 
   dd = isNaN(dd) ? null : Math.abs(dd);
   sd = isNaN(sd) ? null : Math.abs(sd);
@@ -274,9 +287,9 @@ function saveWizard() {
   saveState();
 }
 
-/* =======================================================================
-   RESULTS PAGE – GRAPHS + TABLES
-   ======================================================================= */
+/* ============================================================================
+   RESULTS PAGE
+============================================================================ */
 
 function buildResultsPage() {
   $("pageResults").innerHTML = `
@@ -300,6 +313,7 @@ function buildResultsPage() {
 }
 
 /* -------------------- CALCULATE -------------------- */
+
 function calculateAll() {
   let compiled = {};
 
@@ -308,7 +322,6 @@ function calculateAll() {
 
     ["present", "reference"].forEach(st => {
       const arr = state.values[tx][st];
-
       compiled[tx][st].ddm = arr.map(v => v.DDM === null ? null : Math.abs(v.DDM));
       compiled[tx][st].sdm = arr.map(v => v.SDM === null ? null : Math.abs(v.SDM));
       compiled[tx][st].rf  = arr.map(v => v.RF === null ? null : Math.abs(v.RF));
@@ -319,9 +332,9 @@ function calculateAll() {
   renderTables();
 }
 
-/* =======================================================================
-   PLOTS (EXCEL-STYLE)
-   ======================================================================= */
+/* ============================================================================
+   PLOTS
+============================================================================ */
 
 function renderPlots(compiled) {
   $("plots").innerHTML = `
@@ -356,7 +369,6 @@ function renderPlots(compiled) {
     pointRadius: 2
   });
 
-  /* TX1 */
   new Chart($("#c1").getContext("2d"), {
     type: "line",
     data: {
@@ -373,7 +385,6 @@ function renderPlots(compiled) {
     options: opts
   });
 
-  /* TX2 */
   new Chart($("#c2").getContext("2d"), {
     type: "line",
     data: {
@@ -391,16 +402,16 @@ function renderPlots(compiled) {
   });
 }
 
-/* =======================================================================
-   TABLE GENERATION
-   ======================================================================= */
-
+/* ============================================================================
+   TABLES
+============================================================================ */
 function renderTables() {
   $("tables").innerHTML = "";
 
   ["tx1", "tx2"].forEach(tx => {
     let div = document.createElement("div");
     div.className = "tableCard";
+
     div.innerHTML = `<h4>${tx.toUpperCase()}</h4>`;
 
     let t = document.createElement("table");
@@ -429,10 +440,9 @@ function renderTables() {
   });
 }
 
-/* =======================================================================
-   EXPORT IMAGES (TX1.png + TX2.png)
-   ======================================================================= */
-
+/* ============================================================================
+   EXPORT IMAGES
+============================================================================ */
 function exportGraphImages() {
   [
     { id: "c1", name: "TX1_Graph.png" },
@@ -440,7 +450,6 @@ function exportGraphImages() {
   ].forEach(o => {
     let c = $(o.id);
     if (!c) return;
-
     let a = document.createElement("a");
     a.href = c.toDataURL("image/png");
     a.download = o.name;
@@ -450,10 +459,9 @@ function exportGraphImages() {
   alert("Images exported!");
 }
 
-/* =======================================================================
-   EXPORT EXCEL (CSV)
-   ======================================================================= */
-
+/* ============================================================================
+   EXPORT EXCEL (.CSV)
+============================================================================ */
 function exportExcel() {
   let csv = "";
 
@@ -483,9 +491,9 @@ function exportExcel() {
   a.click();
 }
 
-/* =======================================================================
-   SAVED REPORTS (NO CHANGE)
-   ======================================================================= */
+/* ============================================================================
+   SAVED REPORTS
+============================================================================ */
 
 function buildSavedPage() {
   $("pageSaved").innerHTML = `
@@ -534,9 +542,9 @@ function buildSavedPage() {
   });
 }
 
-/* =======================================================================
-   INITIAL LOAD
-   ======================================================================= */
+/* ============================================================================
+   INITIAL STARTUP
+============================================================================ */
 
 document.addEventListener("DOMContentLoaded", () => {
   buildMetaPage();
