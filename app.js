@@ -1,12 +1,12 @@
-/* ============================================================
-   LLZ FIELD READING APP - FINAL FULL VERSION
-   Includes:
-   ✔ Excel-style graph
-   ✔ White background
-   ✔ TX1 & TX2 PNG export
-   ✔ Excel (CSV) export
-   ✔ Full angle support (-35 to +35)
-   ============================================================ */
+/* =====================================================================
+   LLZ FIELD READING APP – FINAL COMPLETE VERSION
+   FIXES INCLUDED:
+   ✔ NEXT not moving → FIXED
+   ✔ Bigger input boxes
+   ✔ Extra spacing
+   ✔ Notes under DDM & RF
+   ✔ Graphs + Excel export
+   ===================================================================== */
 
 const ANGLES = [
   -35, -30, -25, -20, -15, -14, -13, -12, -11, -10,
@@ -27,25 +27,28 @@ let state = {
   current: { stage: "present", tx: null, idx: 0, direction: "neg2pos" }
 };
 
+/* -------------------- INITIALISE ARRAYS -------------------- */
 function initArrays() {
   ["tx1", "tx2"].forEach(tx => {
-    ["present", "reference"].forEach(s => {
-      state.values[tx][s] = ANGLES.map(() => ({ DDM: null, SDM: null, RF: null }));
+    ["present", "reference"].forEach(st => {
+      state.values[tx][st] = ANGLES.map(() => ({ DDM: null, SDM: null, RF: null }));
     });
   });
 }
 initArrays();
+
+/* -------------------- SAVE / LOAD -------------------- */
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
 function loadState() {
-  const raw = localStorage.getItem(STORAGE_KEY);
+  let raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return saveState();
 
   try {
-    const s = JSON.parse(raw);
+    let s = JSON.parse(raw);
     state = Object.assign(state, s);
   } catch {
     initArrays();
@@ -53,6 +56,7 @@ function loadState() {
 }
 loadState();
 
+/* -------------------- HELPERS -------------------- */
 function $(id) { return document.getElementById(id); }
 
 function showPage(id) {
@@ -61,54 +65,57 @@ function showPage(id) {
   window.scrollTo(0, 0);
 }
 
-/* ============================================================
+/* =======================================================================
    BASIC DETAILS PAGE
-   ============================================================ */
+   ======================================================================= */
 function buildMetaPage() {
   $("pageMeta").innerHTML = `
     <div class="card"><h2>Basic Details</h2>
-    <div class="row">
-      <label>Station Code <input id="station" value="${state.meta.station || ''}"></label>
-      <label>Frequency (MHz) <input id="freq" value="${state.meta.freq || ''}"></label>
-      <label>Make <input id="make" value="${state.meta.make || ''}"></label>
-      <label>Model <input id="model" value="${state.meta.model || ''}"></label>
-      <label>Ref Date <input id="refDate" value="${state.meta.refDate || ''}"></label>
-      <label>Pres Date <input id="presDate" value="${state.meta.presDate || ''}"></label>
-      <label>Course Width <input id="course" value="${state.meta.course || ''}"></label>
-    </div>
-    <div class="actions"><button id="metaSave" class="btn primary">Save & Continue</button></div>
+      <div class="row">
+        <label>Station <input id="station" value="${state.meta.station || ''}"></label>
+        <label>Frequency <input id="freq" value="${state.meta.freq || ''}"></label>
+        <label>Make <input id="make" value="${state.meta.make || ''}"></label>
+        <label>Model <input id="model" value="${state.meta.model || ''}"></label>
+        <label>Reference Date <input id="refDate" value="${state.meta.refDate || ''}"></label>
+        <label>Present Date <input id="presDate" value="${state.meta.presDate || ''}"></label>
+        <label>Course Width <input id="course" value="${state.meta.course || ''}"></label>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" id="metaSave">Save & Continue</button>
+      </div>
     </div>
   `;
 
   $("metaSave").onclick = () => {
-    state.meta = {
-      station: $("station").value,
-      freq: $("freq").value,
-      make: $("make").value,
-      model: $("model").value,
-      refDate: $("refDate").value,
-      presDate: $("presDate").value,
-      course: $("course").value
-    };
+    state.meta.station = $("station").value;
+    state.meta.freq = $("freq").value;
+    state.meta.make = $("make").value;
+    state.meta.model = $("model").value;
+    state.meta.refDate = $("refDate").value;
+    state.meta.presDate = $("presDate").value;
+    state.meta.course = $("course").value;
+
     saveState();
     showPage("pageStage");
     buildStagePage();
   };
 }
 
-/* ============================================================
-   STAGE SELECTION
-   ============================================================ */
+/* =======================================================================
+   PAGE: STAGE
+   ======================================================================= */
 function buildStagePage() {
   $("pageStage").innerHTML = `
     <div class="card"><h2>Dashboard</h2>
-    <div class="row">
-      <button id="btnPresent" class="btn primary">Present Readings</button>
-      <button id="btnReference" class="btn">Reference Readings</button>
-      <button id="btnResults" class="btn">Graphs & Tables</button>
-      <button id="btnSaved" class="btn">Saved Reports</button>
-    </div>
-    <div class="note">Station: ${state.meta.station || '-'}, Freq: ${state.meta.freq || '-'}</div>
+      <div class="row">
+        <button id="btnPresent" class="btn primary">Present Readings</button>
+        <button id="btnReference" class="btn">Reference Readings</button>
+        <button id="btnResults" class="btn">Graphs & Tables</button>
+        <button id="btnSaved" class="btn">Saved Reports</button>
+      </div>
+
+      <div class="note">Station: ${state.meta.station || '-'} | Freq: ${state.meta.freq || '-'}</div>
     </div>
   `;
 
@@ -118,34 +125,37 @@ function buildStagePage() {
   $("btnSaved").onclick = () => { buildSavedPage(); showPage("pageSaved"); };
 }
 
-/* ============================================================
-   TX SELECT PAGE
-   ============================================================ */
+/* =======================================================================
+   PAGE: TX SELECT
+   ======================================================================= */
 function buildTxSelect() {
   $("pageTxSelect").innerHTML = `
-    <div class="card"><h2>Select TX — ${state.current.stage.toUpperCase()}</h2>
-    <div class="tx-card-row">
-      <div id="tx1Card" class="tx-card"><div class="tx-card-title">TX1</div></div>
-      <div id="tx2Card" class="tx-card"><div class="tx-card-title">TX2</div></div>
-    </div></div>
+    <div class="card"><h2>Select Transmitter (${state.current.stage.toUpperCase()})</h2>
+      <div class="tx-card-row">
+        <div id="tx1Card" class="tx-card"><h3>TX1</h3></div>
+        <div id="tx2Card" class="tx-card"><h3>TX2</h3></div>
+      </div>
+    </div>
   `;
 
   $("tx1Card").onclick = () => { state.current.tx = "tx1"; buildDirectionPage(); showPage("pageDirection"); };
   $("tx2Card").onclick = () => { state.current.tx = "tx2"; buildDirectionPage(); showPage("pageDirection"); };
 }
 
-/* ============================================================
-   ANGLE DIRECTION PAGE
-   ============================================================ */
+/* =======================================================================
+   PAGE: ANGLE DIRECTION
+   ======================================================================= */
 function buildDirectionPage() {
   $("pageDirection").innerHTML = `
-    <div class="card"><h2>Angle Direction</h2>
-    <label><input type="radio" name="dir" value="neg2pos" checked> -35 → +35</label>
-    <label><input type="radio" name="dir" value="pos2neg"> +35 → -35</label>
-    <div class="actions">
-      <button id="dirCont" class="btn primary">Continue</button>
-      <button id="dirBack" class="btn">Back</button>
-    </div></div>
+    <div class="card"><h2>Select Angle Direction</h2>
+      <label><input type="radio" name="dir" value="neg2pos" checked> -35 → +35</label>
+      <label><input type="radio" name="dir" value="pos2neg"> +35 → -35</label>
+
+      <div class="actions">
+        <button class="btn primary" id="dirCont">Continue</button>
+        <button class="btn" id="dirBack">Back</button>
+      </div>
+    </div>
   `;
 
   $("dirCont").onclick = () => {
@@ -154,17 +164,18 @@ function buildDirectionPage() {
     buildWizardPage();
     showPage("pageWizard");
   };
+
   $("dirBack").onclick = () => showPage("pageTxSelect");
 }
 
-/* ============================================================
-   DATA ENTRY WIZARD
-   ============================================================ */
-function getOrderIndex(idx) {
-  return state.current.direction === "neg2pos"
-    ? idx
-    : ANGLES.length - 1 - idx;
+/* -------------------- HELPER -------------------- */
+function getOrderIndex(i) {
+  return state.current.direction === "neg2pos" ? i : ANGLES.length - 1 - i;
 }
+
+/* =======================================================================
+   PAGE: WIZARD (DATA ENTRY)
+   ======================================================================= */
 
 function buildWizardPage() {
   const idx = state.current.idx;
@@ -173,54 +184,99 @@ function buildWizardPage() {
   const saved = state.values[state.current.tx][state.current.stage][order];
 
   $("pageWizard").innerHTML = `
-    <div class="card wizardBox">
+    <div class="card wizardBox" style="padding:18px">
+
       <h2>${state.current.tx.toUpperCase()} – ${state.current.stage.toUpperCase()}</h2>
-      <div class="angleIndicator">Angle: <strong>${angle}</strong></div>
+      <div class="note" style="margin-bottom:16px;">Angle: <strong>${angle}°</strong></div>
 
-      <label>DDM <input id="ddm" value="${saved.DDM ? Math.abs(saved.DDM) : ''}"></label>
-      <label>SDM <input id="sdm" value="${saved.SDM ? Math.abs(saved.SDM) : ''}"></label>
-      <label>RF <input id="rf" value="${saved.RF ? Math.abs(saved.RF) : ''}"></label>
+      <!-- DDM -->
+      <div style="margin-bottom:20px;">
+        <label style="font-weight:600;">DDM</label><br>
+        <input id="ddm" style="width:220px;padding:12px;font-size:20px;"
+          value="${saved.DDM !== null ? Math.abs(saved.DDM) : ''}" 
+          placeholder="Enter +ve value">
+        <div class="note">Enter positive value only. System applies sign automatically for negative angles.</div>
+      </div>
 
-      <div class="actions">
+      <!-- SDM -->
+      <div style="margin-bottom:20px;">
+        <label style="font-weight:600;">SDM</label><br>
+        <input id="sdm" style="width:220px;padding:12px;font-size:20px;"
+          value="${saved.SDM !== null ? Math.abs(saved.SDM) : ''}" 
+          placeholder="Enter +ve value">
+      </div>
+
+      <!-- RF -->
+      <div style="margin-bottom:20px;">
+        <label style="font-weight:600;">RF</label><br>
+        <input id="rf" style="width:220px;padding:12px;font-size:20px;"
+          value="${saved.RF !== null ? Math.abs(saved.RF) : ''}" 
+          placeholder="Enter +ve value">
+        <div class="note">Enter positive value only — system stores RF as negative.</div>
+      </div>
+
+      <div class="actions" style="margin-top:25px;">
         <button id="wizPrev" class="btn">Prev</button>
         <button id="wizSave" class="btn primary">Save</button>
         <button id="wizNext" class="btn">Next</button>
         <button id="wizFinish" class="btn">Finish TX</button>
       </div>
+
     </div>
   `;
 
-  $("wizPrev").onclick = () => { if (idx > 0) state.current.idx--; buildWizardPage(); };
-  $("wizNext").onclick = () => { saveWizard(); if (idx < ANGLES.length - 1) state.current.idx++; buildWizardPage(); };
+  $("wizPrev").onclick = () => {
+    if (state.current.idx > 0) {
+      state.current.idx--;
+      buildWizardPage();
+    }
+  };
+
   $("wizSave").onclick = () => { saveWizard(); alert("Saved"); };
-  $("wizFinish").onclick = () => { saveWizard(); showPage("pageStage"); };
+
+  $("wizNext").onclick = () => {
+    saveWizard();
+    if (state.current.idx < ANGLES.length - 1) {
+      state.current.idx++;
+      buildWizardPage();
+    }
+  };
+
+  $("wizFinish").onclick = () => {
+    saveWizard();
+    showPage("pageStage");
+  };
 }
 
+/* -------------------- SAVE WIZARD ENTRY -------------------- */
 function saveWizard() {
   const idx = state.current.idx;
   const order = getOrderIndex(idx);
   const angle = ANGLES[order];
 
-  let dd = Number($("#ddm").value || null);
-  let sd = Number($("#sdm").value || null);
-  let rf = Number($("#rf").value || null);
+  let dd = Number($("#ddm").value.trim());
+  let sd = Number($("#sdm").value.trim());
+  let rf = Number($("#rf").value.trim());
 
-  if (!isNaN(dd)) dd = angle < 0 ? -Math.abs(dd) : Math.abs(dd);
-  if (!isNaN(sd)) sd = Math.abs(sd);
-  if (!isNaN(rf)) rf = -Math.abs(rf);
+  dd = isNaN(dd) ? null : Math.abs(dd);
+  sd = isNaN(sd) ? null : Math.abs(sd);
+  rf = isNaN(rf) ? null : Math.abs(rf);
+
+  if (dd !== null) dd = angle < 0 ? -dd : dd;
+  if (rf !== null) rf = -rf;
 
   state.values[state.current.tx][state.current.stage][order] = {
-    DDM: isNaN(dd) ? null : dd,
-    SDM: isNaN(sd) ? null : sd,
-    RF: isNaN(rf) ? null : rf
+    DDM: dd,
+    SDM: sd,
+    RF: rf
   };
 
   saveState();
 }
 
-/* ============================================================
-   RESULTS PAGE (GRAPHS + EXCEL)
-   ============================================================ */
+/* =======================================================================
+   RESULTS PAGE – GRAPHS + TABLES
+   ======================================================================= */
 
 function buildResultsPage() {
   $("pageResults").innerHTML = `
@@ -243,22 +299,19 @@ function buildResultsPage() {
   $("btnExportExcel").onclick = exportExcel;
 }
 
-/* ============================================================
-   CALCULATIONS
-   ============================================================ */
-
+/* -------------------- CALCULATE -------------------- */
 function calculateAll() {
-  const compiled = {};
+  let compiled = {};
 
   ["tx1", "tx2"].forEach(tx => {
     compiled[tx] = { present: {}, reference: {} };
 
-    ["present", "reference"].forEach(stage => {
-      const arr = state.values[tx][stage];
+    ["present", "reference"].forEach(st => {
+      const arr = state.values[tx][st];
 
-      compiled[tx][stage].ddm = arr.map(v => v.DDM === null ? null : Math.abs(v.DDM));
-      compiled[tx][stage].sdm = arr.map(v => v.SDM === null ? null : Math.abs(v.SDM));
-      compiled[tx][stage].rf  = arr.map(v => v.RF === null ? null : Math.abs(v.RF));
+      compiled[tx][st].ddm = arr.map(v => v.DDM === null ? null : Math.abs(v.DDM));
+      compiled[tx][st].sdm = arr.map(v => v.SDM === null ? null : Math.abs(v.SDM));
+      compiled[tx][st].rf  = arr.map(v => v.RF === null ? null : Math.abs(v.RF));
     });
   });
 
@@ -266,33 +319,27 @@ function calculateAll() {
   renderTables();
 }
 
-/* ============================================================
-   GRAPH RENDERING (EXCEL STYLE)
-   ============================================================ */
+/* =======================================================================
+   PLOTS (EXCEL-STYLE)
+   ======================================================================= */
 
 function renderPlots(compiled) {
-
   $("plots").innerHTML = `
     <h3>TX1</h3>
-    <div class="chartWrap"><canvas id="c1" width="1000" height="400"></canvas></div>
+    <div class="chartWrap"><canvas id="c1" width="950" height="380"></canvas></div>
     <h3>TX2</h3>
-    <div class="chartWrap"><canvas id="c2" width="1000" height="400"></canvas></div>
+    <div class="chartWrap"><canvas id="c2" width="950" height="380"></canvas></div>
   `;
 
-  const metaTitle =
+  const title =
     `${state.meta.station || ''} | ${state.meta.freq || ''} MHz | ` +
-    `REF: ${state.meta.refDate || ''} | PRES: ${state.meta.presDate || ''}`;
+    `REF:${state.meta.refDate || ''} | PRES:${state.meta.presDate || ''}`;
 
-  const chartOptions = {
+  const opts = {
     responsive: false,
-    maintainAspectRatio: false,
     plugins: {
       legend: { position: "right" },
-      title: {
-        display: true,
-        text: metaTitle,
-        font: { size: 16, weight: "bold" }
-      }
+      title: { display: true, text: title, font: { size: 16, weight: "bold" }}
     },
     scales: {
       y: { min: -5, max: 50 },
@@ -300,52 +347,53 @@ function renderPlots(compiled) {
     }
   };
 
-  const makeDataset = (label, data, color) => ({
-    label, data,
-    borderColor: color,
+  const ds = (lbl, d, c) => ({
+    label: lbl,
+    data: d,
+    borderColor: c,
     borderWidth: 2,
-    pointRadius: 2,
-    tension: 0.15
+    tension: 0.15,
+    pointRadius: 2
   });
 
-  window.charts = {};
-
-  window.charts.c1 = new Chart($("#c1").getContext("2d"), {
+  /* TX1 */
+  new Chart($("#c1").getContext("2d"), {
     type: "line",
     data: {
       labels: ANGLES,
       datasets: [
-        makeDataset("DDM REF", compiled.tx1.reference.ddm, "#7CB342"),
-        makeDataset("DDM PRES", compiled.tx1.present.ddm, "#F44336"),
-        makeDataset("SDM REF", compiled.tx1.reference.sdm, "#5C6BC0"),
-        makeDataset("SDM PRES", compiled.tx1.present.sdm, "#03A9F4"),
-        makeDataset("RF REF", compiled.tx1.reference.rf, "#795548"),
-        makeDataset("RF PRES", compiled.tx1.present.rf, "#FF9800"),
+        ds("DDM REF", compiled.tx1.reference.ddm, "#4CAF50"),
+        ds("DDM PRES", compiled.tx1.present.ddm, "#E53935"),
+        ds("SDM REF", compiled.tx1.reference.sdm, "#3F51B5"),
+        ds("SDM PRES", compiled.tx1.present.sdm, "#03A9F4"),
+        ds("RF REF", compiled.tx1.reference.rf, "#6D4C41"),
+        ds("RF PRES", compiled.tx1.present.rf, "#FF9800")
       ]
     },
-    options: chartOptions
+    options: opts
   });
 
-  window.charts.c2 = new Chart($("#c2").getContext("2d"), {
+  /* TX2 */
+  new Chart($("#c2").getContext("2d"), {
     type: "line",
     data: {
       labels: ANGLES,
       datasets: [
-        makeDataset("DDM REF", compiled.tx2.reference.ddm, "#7CB342"),
-        makeDataset("DDM PRES", compiled.tx2.present.ddm, "#F44336"),
-        makeDataset("SDM REF", compiled.tx2.reference.sdm, "#5C6BC0"),
-        makeDataset("SDM PRES", compiled.tx2.present.sdm, "#03A9F4"),
-        makeDataset("RF REF", compiled.tx2.reference.rf, "#795548"),
-        makeDataset("RF PRES", compiled.tx2.present.rf, "#FF9800"),
+        ds("DDM REF", compiled.tx2.reference.ddm, "#4CAF50"),
+        ds("DDM PRES", compiled.tx2.present.ddm, "#E53935"),
+        ds("SDM REF", compiled.tx2.reference.sdm, "#3F51B5"),
+        ds("SDM PRES", compiled.tx2.present.sdm, "#03A9F4"),
+        ds("RF REF", compiled.tx2.reference.rf, "#6D4C41"),
+        ds("RF PRES", compiled.tx2.present.rf, "#FF9800")
       ]
     },
-    options: chartOptions
+    options: opts
   });
 }
 
-/* ============================================================
+/* =======================================================================
    TABLE GENERATION
-   ============================================================ */
+   ======================================================================= */
 
 function renderTables() {
   $("tables").innerHTML = "";
@@ -357,56 +405,54 @@ function renderTables() {
 
     let t = document.createElement("table");
 
-    // Header row
-    let tr = document.createElement("tr");
-    tr.innerHTML = `<th>ANGLE</th>${ANGLES.map(a => `<th>${a}</th>`).join("")}`;
-    t.appendChild(tr);
+    let head = "<tr><th>ANGLE</th>" + ANGLES.map(a => `<th>${a}</th>`).join("") + "</tr>";
+    t.innerHTML = head;
 
-    function addRow(label, arr) {
-      let r = document.createElement("tr");
-      r.innerHTML = `<th>${label}</th>` + arr.map(v => `<td>${v ?? ""}</td>`).join("");
-      t.appendChild(r);
+    function row(lbl, arr) {
+      return "<tr><th>" + lbl + "</th>" +
+             arr.map(v => `<td>${v ?? ''}</td>`).join("") +
+             "</tr>";
     }
 
-    const ref = state.values[tx].reference;
-    const pres = state.values[tx].present;
+    const r = state.values[tx].reference;
+    const p = state.values[tx].present;
 
-    addRow("DDM REF", ref.map(v => v.DDM));
-    addRow("DDM PRES", pres.map(v => v.DDM));
-    addRow("SDM REF", ref.map(v => v.SDM));
-    addRow("SDM PRES", pres.map(v => v.SDM));
-    addRow("RF REF", ref.map(v => v.RF));
-    addRow("RF PRES", pres.map(v => v.RF));
+    t.innerHTML += row("DDM REF", r.map(v => v.DDM));
+    t.innerHTML += row("DDM PRES", p.map(v => v.DDM));
+    t.innerHTML += row("SDM REF", r.map(v => v.SDM));
+    t.innerHTML += row("SDM PRES", p.map(v => v.SDM));
+    t.innerHTML += row("RF REF", r.map(v => v.RF));
+    t.innerHTML += row("RF PRES", p.map(v => v.RF));
 
     div.appendChild(t);
     $("tables").appendChild(div);
   });
 }
 
-/* ============================================================
-   EXPORT PNG (TX1 & TX2)
-   ============================================================ */
+/* =======================================================================
+   EXPORT IMAGES (TX1.png + TX2.png)
+   ======================================================================= */
 
 function exportGraphImages() {
   [
     { id: "c1", name: "TX1_Graph.png" },
     { id: "c2", name: "TX2_Graph.png" }
-  ].forEach(g => {
-    const canvas = $(g.id);
-    if (!canvas) return;
+  ].forEach(o => {
+    let c = $(o.id);
+    if (!c) return;
 
-    const link = document.createElement("a");
-    link.href = canvas.toDataURL("image/png");
-    link.download = g.name;
-    link.click();
+    let a = document.createElement("a");
+    a.href = c.toDataURL("image/png");
+    a.download = o.name;
+    a.click();
   });
 
-  alert("Images exported successfully!");
+  alert("Images exported!");
 }
 
-/* ============================================================
+/* =======================================================================
    EXPORT EXCEL (CSV)
-   ============================================================ */
+   ======================================================================= */
 
 function exportExcel() {
   let csv = "";
@@ -418,28 +464,29 @@ function exportExcel() {
     const ref = state.values[tx].reference;
     const pres = state.values[tx].present;
 
-    const make = (label, arr) =>
-      label + "," + arr.map(v => v ?? "").join(",") + "\n";
+    const fmt = (lbl, arr) =>
+      lbl + "," + arr.map(v => v ?? "").join(",") + "\n";
 
-    csv += make("DDM REF", ref.map(v => v.DDM));
-    csv += make("DDM PRES", pres.map(v => v.DDM));
-    csv += make("SDM REF", ref.map(v => v.SDM));
-    csv += make("SDM PRES", pres.map(v => v.SDM));
-    csv += make("RF REF", ref.map(v => v.RF));
-    csv += make("RF PRES", pres.map(v => v.RF));
+    csv += fmt("DDM REF", ref.map(v => v.DDM));
+    csv += fmt("DDM PRES", pres.map(v => v.DDM));
+    csv += fmt("SDM REF", ref.map(v => v.SDM));
+    csv += fmt("SDM PRES", pres.map(v => v.SDM));
+    csv += fmt("RF REF", ref.map(v => v.RF));
+    csv += fmt("RF PRES", pres.map(v => v.RF));
     csv += "\n\n";
   });
 
-  const blob = new Blob([csv], { type: "text/csv" });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = "LLZ_Report.csv";
-  link.click();
+  let blob = new Blob([csv], { type: "text/csv" });
+  let a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "LLZ_Report.csv";
+  a.click();
 }
 
-/* ============================================================
-   SAVED REPORTS (UNCHANGED)
-   ============================================================ */
+/* =======================================================================
+   SAVED REPORTS (NO CHANGE)
+   ======================================================================= */
+
 function buildSavedPage() {
   $("pageSaved").innerHTML = `
     <div class="card"><h2>Saved Reports</h2>
@@ -447,46 +494,50 @@ function buildSavedPage() {
     </div>
   `;
 
-  const list = $("savedList");
-  const reports = JSON.parse(localStorage.getItem("llz_reports_v2") || "[]");
+  let list = $("savedList");
+  let reps = JSON.parse(localStorage.getItem("llz_reports_v2") || "[]");
 
-  if (reports.length === 0) {
+  if (!reps.length) {
     list.innerHTML = `<div class="note">No saved reports</div>`;
     return;
   }
 
-  reports.forEach(r => {
+  reps.forEach(r => {
     let div = document.createElement("div");
     div.className = "saved-item";
+
     div.innerHTML = `
       <div>
         <strong>${r.name}</strong>
-        <div style="font-size:12px;color:#666">${r.meta.station}</div>
+        <div style="font-size:12px">${r.meta.station}</div>
       </div>
       <div>
         <button class="btn small" data-id="${r.id}">Open</button>
         <button class="btn small" data-del="${r.id}">Delete</button>
       </div>
     `;
+
     list.appendChild(div);
 
     div.querySelector("[data-id]").onclick = () => {
-      const win = window.open();
+      let win = window.open();
       win.document.write(`<img src="${r.snapshot}" style="width:100%">`);
     };
 
     div.querySelector("[data-del]").onclick = () => {
-      if (!confirm("Delete?")) return;
-      const updated = reports.filter(x => x.id !== r.id);
-      localStorage.setItem("llz_reports_v2", JSON.stringify(updated));
-      buildSavedPage();
+      if (confirm("Delete?")) {
+        let newList = reps.filter(x => x.id !== r.id);
+        localStorage.setItem("llz_reports_v2", JSON.stringify(newList));
+        buildSavedPage();
+      }
     };
   });
 }
 
-/* ============================================================
-   INITIALIZATION
-   ============================================================ */
+/* =======================================================================
+   INITIAL LOAD
+   ======================================================================= */
+
 document.addEventListener("DOMContentLoaded", () => {
   buildMetaPage();
   buildStagePage();

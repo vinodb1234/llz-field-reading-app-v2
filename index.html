@@ -6,16 +6,12 @@
 
   <title>LLZ Field Reading App</title>
 
-  <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.json">
-
-  <!-- Main Styles -->
   <link rel="stylesheet" href="styles.css">
-
 </head>
+
 <body>
 
-  <!-- TOP BAR -->
   <div class="topbar">
     <div class="topbar-row container">
       <button class="menu-btn" id="menuBtn">☰</button>
@@ -24,8 +20,8 @@
     </div>
   </div>
 
-  <!-- SIDE MENU -->
   <div id="sideMenu" class="side-menu" aria-hidden="true">
+
     <div class="menu-header">LLZ Field Reading App</div>
 
     <div class="menu-list">
@@ -42,7 +38,7 @@
     <div class="menu-footer">Developed by B. Vinod, Manager (CNS)</div>
   </div>
 
-  <!-- PAGES -->
+  <!-- APP PAGES -->
   <div id="pageMeta" class="page container"></div>
   <div id="pageStage" class="page container hidden"></div>
   <div id="pageTxSelect" class="page container hidden"></div>
@@ -51,25 +47,20 @@
   <div id="pageResults" class="page container hidden"></div>
   <div id="pageSaved" class="page container hidden"></div>
 
-  <!-- Scripts -->
+  <!-- LIBRARIES -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 
+  <!-- MAIN APP -->
   <script src="app.js"></script>
 
   <script>
-    /* =============================
-       SIDE MENU FUNCTIONALITY
-       ============================= */
+    /* SIDE MENU */
     const menuBtn = document.getElementById("menuBtn");
     const side = document.getElementById("sideMenu");
 
     menuBtn.onclick = () => side.classList.toggle("show");
 
-    document.getElementById("mBasic").onclick = () => {
-      side.classList.remove("show");
-      showPage("pageMeta");
-    };
+    document.getElementById("mBasic").onclick = () => { side.classList.remove("show"); showPage("pageMeta"); };
 
     document.getElementById("mPresent").onclick = () => {
       side.classList.remove("show");
@@ -108,20 +99,16 @@
     };
 
     document.getElementById("mClear").onclick = () => {
-      if (confirm("Clear all saved data?")) {
-        localStorage.removeItem("llz_v2_state");
-        localStorage.removeItem("llz_reports_v2");
+      if (confirm("Clear all data?")) {
+        localStorage.clear();
         location.reload();
       }
     };
 
-    /* PWA SERVICE WORKER */
+    /* SERVICE WORKER */
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker
-        .register("service-worker.js")
-        .catch(() => console.log("Service Worker registration failed"));
+      navigator.serviceWorker.register("service-worker.js");
     }
   </script>
-
 </body>
 </html>
