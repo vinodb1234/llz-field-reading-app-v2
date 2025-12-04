@@ -3,11 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+
   <title>LLZ Field Reading App</title>
+
+  <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.json">
+
+  <!-- Main Styles -->
   <link rel="stylesheet" href="styles.css">
+
 </head>
 <body>
+
+  <!-- TOP BAR -->
   <div class="topbar">
     <div class="topbar-row container">
       <button class="menu-btn" id="menuBtn">☰</button>
@@ -16,22 +24,25 @@
     </div>
   </div>
 
+  <!-- SIDE MENU -->
   <div id="sideMenu" class="side-menu" aria-hidden="true">
     <div class="menu-header">LLZ Field Reading App</div>
+
     <div class="menu-list">
       <button id="mBasic">Basic Details</button>
       <button id="mPresent">Present Readings</button>
       <button id="mReference">Reference Readings</button>
       <button id="mResults">Graphs & Tables</button>
       <button id="mSaved">Saved Reports</button>
-      <button id="mExportPdf">Export PDF</button>
       <button id="mExportImgs">Export Images</button>
+      <button id="mExportExcel">Export Excel</button>
       <button id="mClear">Clear All Data</button>
     </div>
+
     <div class="menu-footer">Developed by B. Vinod, Manager (CNS)</div>
   </div>
 
-  <!-- Pages -->
+  <!-- PAGES -->
   <div id="pageMeta" class="page container"></div>
   <div id="pageStage" class="page container hidden"></div>
   <div id="pageTxSelect" class="page container hidden"></div>
@@ -40,14 +51,77 @@
   <div id="pageResults" class="page container hidden"></div>
   <div id="pageSaved" class="page container hidden"></div>
 
+  <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
   <script src="app.js"></script>
+
   <script>
-    if('serviceWorker' in navigator){
-      navigator.serviceWorker.register('service-worker.js').catch(()=>console.log('SW reg failed'));
+    /* =============================
+       SIDE MENU FUNCTIONALITY
+       ============================= */
+    const menuBtn = document.getElementById("menuBtn");
+    const side = document.getElementById("sideMenu");
+
+    menuBtn.onclick = () => side.classList.toggle("show");
+
+    document.getElementById("mBasic").onclick = () => {
+      side.classList.remove("show");
+      showPage("pageMeta");
+    };
+
+    document.getElementById("mPresent").onclick = () => {
+      side.classList.remove("show");
+      state.current.stage = "present";
+      buildTxSelect();
+      showPage("pageTxSelect");
+    };
+
+    document.getElementById("mReference").onclick = () => {
+      side.classList.remove("show");
+      state.current.stage = "reference";
+      buildTxSelect();
+      showPage("pageTxSelect");
+    };
+
+    document.getElementById("mResults").onclick = () => {
+      side.classList.remove("show");
+      buildResultsPage();
+      showPage("pageResults");
+    };
+
+    document.getElementById("mSaved").onclick = () => {
+      side.classList.remove("show");
+      buildSavedPage();
+      showPage("pageSaved");
+    };
+
+    document.getElementById("mExportImgs").onclick = () => {
+      side.classList.remove("show");
+      exportGraphImages();
+    };
+
+    document.getElementById("mExportExcel").onclick = () => {
+      side.classList.remove("show");
+      exportExcel();
+    };
+
+    document.getElementById("mClear").onclick = () => {
+      if (confirm("Clear all saved data?")) {
+        localStorage.removeItem("llz_v2_state");
+        localStorage.removeItem("llz_reports_v2");
+        location.reload();
+      }
+    };
+
+    /* PWA SERVICE WORKER */
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker
+        .register("service-worker.js")
+        .catch(() => console.log("Service Worker registration failed"));
     }
   </script>
+
 </body>
 </html>
