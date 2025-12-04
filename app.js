@@ -1,13 +1,11 @@
 /* ============================================================================
    LLZ FIELD READING APP – FINAL FULL VERSION (WITH ALL FIXES)
-   Author: B. Vinod
-   Features:
+   Includes:
    ✔ NEXT bug fixed
-   ✔ Enter/Arrow navigation
-   ✔ Bigger input boxes + more spacing
-   ✔ Notes under DDM & RF
-   ✔ Graphs + Excel + Image export
-   ✔ All angles preserved (-35…35)
+   ✔ Enter/Arrow quick navigation
+   ✔ Bigger input boxes + spacing + helper notes
+   ✔ TX1.png / TX2.png export (updated)
+   ✔ Graphs + Excel export
 ============================================================================ */
 
 const ANGLES = [
@@ -20,6 +18,7 @@ const ANGLES = [
 
 const STORAGE_KEY = "llz_v2_state";
 
+/* STATE */
 let state = {
   meta: {},
   values: {
@@ -29,7 +28,7 @@ let state = {
   current: { stage: "present", tx: null, idx: 0, direction: "neg2pos" }
 };
 
-/* -------------------- INITIALIZE ARRAYS -------------------- */
+/* -------------------- INITIAL SETUP -------------------- */
 function initArrays() {
   ["tx1", "tx2"].forEach(tx => {
     ["present", "reference"].forEach(st => {
@@ -39,23 +38,21 @@ function initArrays() {
 }
 initArrays();
 
+/* SAVE / LOAD */
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
-
 function loadState() {
   let raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return saveState();
-
   try {
     let s = JSON.parse(raw);
     state = Object.assign(state, s);
-  } catch {
-    initArrays();
-  }
+  } catch { initArrays(); }
 }
 loadState();
 
+/* Helper */
 function $(id) { return document.getElementById(id); }
 
 function showPage(id) {
@@ -125,7 +122,7 @@ function buildStagePage() {
 }
 
 /* ============================================================================
-   TX SELECT
+   TX SELECT PAGE
 ============================================================================ */
 function buildTxSelect() {
   $("pageTxSelect").innerHTML = `
@@ -142,7 +139,7 @@ function buildTxSelect() {
 }
 
 /* ============================================================================
-   ANGLE DIRECTION
+   ANGLE DIRECTION PAGE
 ============================================================================ */
 function buildDirectionPage() {
   $("pageDirection").innerHTML = `
@@ -172,7 +169,7 @@ function getOrderIndex(i) {
 }
 
 /* ============================================================================
-   WIZARD (DATA ENTRY) WITH NAVIGATION
+   WIZARD PAGE (DATA ENTRY WITH NAVIGATION)
 ============================================================================ */
 
 function buildWizardPage() {
@@ -187,26 +184,30 @@ function buildWizardPage() {
       <h2>${state.current.tx.toUpperCase()} – ${state.current.stage.toUpperCase()}</h2>
       <div class="note" style="margin-bottom:18px;">Angle: <strong>${angle}°</strong></div>
 
+      <!-- DDM -->
       <div style="margin-bottom:22px;">
         <label style="font-weight:600;">DDM</label><br>
-        <input id="ddm" class="wizInput" style="width:240px;padding:14px;font-size:20px;"
-          value="${saved.DDM !== null ? Math.abs(saved.DDM) : ''}" placeholder="Enter +ve value">
-        <div class="note">Enter positive value — sign applied automatically for negative angles.</div>
+        <input id="ddm" style="width:240px;padding:14px;font-size:20px;"
+          value="${saved.DDM !== null ? Math.abs(saved.DDM) : ''}">
+        <div class="note">Enter positive value — sign auto-applied.</div>
       </div>
 
+      <!-- SDM -->
       <div style="margin-bottom:22px;">
         <label style="font-weight:600;">SDM</label><br>
-        <input id="sdm" class="wizInput" style="width:240px;padding:14px;font-size:20px;"
-          value="${saved.SDM !== null ? Math.abs(saved.SDM) : ''}" placeholder="Enter +ve value">
+        <input id="sdm" style="width:240px;padding:14px;font-size:20px;"
+          value="${saved.SDM !== null ? Math.abs(saved.SDM) : ''}">
       </div>
 
+      <!-- RF -->
       <div style="margin-bottom:22px;">
         <label style="font-weight:600;">RF</label><br>
-        <input id="rf" class="wizInput" style="width:240px;padding:14px;font-size:20px;"
-          value="${saved.RF !== null ? Math.abs(saved.RF) : ''}" placeholder="Enter +ve value">
+        <input id="rf" style="width:240px;padding:14px;font-size:20px;"
+          value="${saved.RF !== null ? Math.abs(saved.RF) : ''}">
         <div class="note">Enter positive value — stored as negative automatically.</div>
       </div>
 
+      <!-- QUICK NEXT -->
       <button id="quickNext" class="btn primary" style="font-size:18px;">⮞ Next Angle</button>
 
       <div class="actions" style="margin-top:20px;">
@@ -219,37 +220,28 @@ function buildWizardPage() {
     </div>
   `;
 
-  $("wizPrev").onclick = () => {
-    if (idx > 0) {
-      state.current.idx--;
-      buildWizardPage();
-    }
-  };
-
+  $("wizPrev").onclick = () => { if (idx > 0) { state.current.idx--; buildWizardPage(); } };
   $("wizSave").onclick = () => { saveWizard(); alert("Saved"); };
 
-  $("wizNext").onclick = () => moveNext();
-  $("quickNext").onclick = () => moveNext();
+  $("wizNext").onclick = () => goNext();
+  $("quickNext").onclick = () => goNext();
 
   $("wizFinish").onclick = () => { saveWizard(); showPage("pageStage"); };
 
-  const ddm = $("ddm");
-  const sdm = $("sdm");
-  const rf  = $("rf");
+  /* ----- Key Navigation ----- */
+  const ddm = $("ddm"), sdm = $("sdm"), rf = $("rf");
 
   ddm.onkeydown = (e) => {
-    if (["Enter","ArrowDown","ArrowRight"].includes(e.key)) sdm.focus();
+    if (["Enter","ArrowRight","ArrowDown"].includes(e.key)) sdm.focus();
   };
-
   sdm.onkeydown = (e) => {
-    if (["Enter","ArrowDown","ArrowRight"].includes(e.key)) rf.focus();
+    if (["Enter","ArrowRight","ArrowDown"].includes(e.key)) rf.focus();
   };
-
   rf.onkeydown = (e) => {
-    if (e.key === "Enter" || e.key === "ArrowRight") moveNext();
+    if (["Enter","ArrowRight"].includes(e.key)) goNext();
   };
 
-  function moveNext() {
+  function goNext() {
     saveWizard();
     if (state.current.idx < ANGLES.length - 1) {
       state.current.idx++;
@@ -333,15 +325,16 @@ function calculateAll() {
 }
 
 /* ============================================================================
-   PLOTS
+   GRAPH PLOTTING (TX1 / TX2) — UPDATED CANVAS IDs
 ============================================================================ */
 
 function renderPlots(compiled) {
   $("plots").innerHTML = `
     <h3>TX1</h3>
-    <div class="chartWrap"><canvas id="c1" width="950" height="380"></canvas></div>
+    <div class="chartWrap"><canvas id="tx1Canvas" width="950" height="380"></canvas></div>
+
     <h3>TX2</h3>
-    <div class="chartWrap"><canvas id="c2" width="950" height="380"></canvas></div>
+    <div class="chartWrap"><canvas id="tx2Canvas" width="950" height="380"></canvas></div>
   `;
 
   const title =
@@ -361,15 +354,12 @@ function renderPlots(compiled) {
   };
 
   const ds = (lbl, d, c) => ({
-    label: lbl,
-    data: d,
-    borderColor: c,
-    borderWidth: 2,
-    tension: 0.15,
-    pointRadius: 2
+    label: lbl, data: d,
+    borderColor: c, borderWidth: 2, tension: 0.15, pointRadius: 2
   });
 
-  new Chart($("#c1").getContext("2d"), {
+  /* TX1 */
+  new Chart($("tx1Canvas").getContext("2d"), {
     type: "line",
     data: {
       labels: ANGLES,
@@ -385,7 +375,8 @@ function renderPlots(compiled) {
     options: opts
   });
 
-  new Chart($("#c2").getContext("2d"), {
+  /* TX2 */
+  new Chart($("tx2Canvas").getContext("2d"), {
     type: "line",
     data: {
       labels: ANGLES,
@@ -403,8 +394,9 @@ function renderPlots(compiled) {
 }
 
 /* ============================================================================
-   TABLES
+   TABLE RENDERING
 ============================================================================ */
+
 function renderTables() {
   $("tables").innerHTML = "";
 
@@ -441,27 +433,32 @@ function renderTables() {
 }
 
 /* ============================================================================
-   EXPORT IMAGES
+   EXPORT IMAGES — UPDATED TO TX1.png / TX2.png
 ============================================================================ */
+
 function exportGraphImages() {
-  [
-    { id: "c1", name: "TX1_Graph.png" },
-    { id: "c2", name: "TX2_Graph.png" }
-  ].forEach(o => {
-    let c = $(o.id);
-    if (!c) return;
-    let a = document.createElement("a");
-    a.href = c.toDataURL("image/png");
-    a.download = o.name;
-    a.click();
+  const list = [
+    { id: "tx1Canvas", name: "TX1.png" },
+    { id: "tx2Canvas", name: "TX2.png" }
+  ];
+
+  list.forEach(item => {
+    const canvas = $(item.id);
+    if (!canvas) return;
+
+    const link = document.createElement("a");
+    link.href = canvas.toDataURL("image/png");
+    link.download = item.name;
+    link.click();
   });
 
-  alert("Images exported!");
+  alert("Exported: TX1.png & TX2.png");
 }
 
 /* ============================================================================
-   EXPORT EXCEL (.CSV)
+   EXPORT EXCEL (CSV)
 ============================================================================ */
+
 function exportExcel() {
   let csv = "";
 
@@ -492,7 +489,7 @@ function exportExcel() {
 }
 
 /* ============================================================================
-   SAVED REPORTS
+   SAVED REPORTS (UNCHANGED)
 ============================================================================ */
 
 function buildSavedPage() {
@@ -543,7 +540,7 @@ function buildSavedPage() {
 }
 
 /* ============================================================================
-   INITIAL STARTUP
+   INITIAL LOAD
 ============================================================================ */
 
 document.addEventListener("DOMContentLoaded", () => {
