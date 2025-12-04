@@ -416,7 +416,7 @@ function renderPlots(compiled) {
   new Chart($("tx2Canvas").getContext("2d"), {
     type: "line",
     data: {
-      labels: ANGETERS,
+      labels: ANGLES,
       datasets: [
         ds("DDM REF", compiled.tx2.reference.ddm, "#4CAF50"),
         ds("DDM PRES", compiled.tx2.present.ddm, "#E53935"),
