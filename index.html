@@ -1,46 +1,37 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>LLZ Field Reading App</title>
-
-  <link rel="stylesheet" href="styles.css">
   <link rel="manifest" href="manifest.json">
-  <link rel="icon" type="image/png" href="icon/icon-192.png">
-
-  <!-- Libraries -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <!-- SheetJS for Excel export -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-
   <div class="topbar">
-    <div class="topbar-row">
-      <div style="display:flex;align-items:center;gap:12px;">
-        <button id="menuButton" class="menu-btn">☰</button>
-        <div class="title">LLZ Field Reading App</div>
-      </div>
+    <div class="topbar-row container">
+      <button class="menu-btn" id="menuBtn">☰</button>
+      <div class="title">LLZ Field Reading App</div>
       <div class="subtitle">Developed by B. Vinod, Manager (CNS)</div>
     </div>
   </div>
 
-  <!-- Side menu -->
-  <div id="sideMenu" class="side-menu">
-    <div class="menu-header">Menu</div>
+  <div id="sideMenu" class="side-menu" aria-hidden="true">
+    <div class="menu-header">LLZ Field Reading App</div>
     <div class="menu-list">
-      <button onclick="showPage('pageMeta')">Basic Details</button>
-      <button onclick="showPage('pageStage')">Present / Reference</button>
-      <button onclick="showPage('pageResults')">Results & Graphs</button>
-      <button onclick="showPage('pageSaved')">Saved Reports</button>
+      <button id="mBasic">Basic Details</button>
+      <button id="mPresent">Present Readings</button>
+      <button id="mReference">Reference Readings</button>
+      <button id="mResults">Graphs & Tables</button>
+      <button id="mSaved">Saved Reports</button>
+      <button id="mExportPdf">Export PDF</button>
+      <button id="mExportImgs">Export Images</button>
+      <button id="mClear">Clear All Data</button>
     </div>
-    <div class="menu-footer">Version 2.1</div>
+    <div class="menu-footer">Developed by B. Vinod, Manager (CNS)</div>
   </div>
 
-  <!-- Pages (empty containers; app.js populates) -->
+  <!-- Pages -->
   <div id="pageMeta" class="page container"></div>
   <div id="pageStage" class="page container hidden"></div>
   <div id="pageTxSelect" class="page container hidden"></div>
@@ -49,26 +40,14 @@
   <div id="pageResults" class="page container hidden"></div>
   <div id="pageSaved" class="page container hidden"></div>
 
-  <!-- small toast -->
-  <div id="globalToast" class="toast hidden"></div>
-
-  <!-- Main app -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="app.js"></script>
-
-  <!-- service worker register -->
   <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js').catch(e=>console.warn(e));
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.register('service-worker.js').catch(()=>console.log('SW reg failed'));
     }
-
-    // side menu toggle
-    const menuBtn = document.getElementById('menuButton');
-    const sideMenu = document.getElementById('sideMenu');
-    menuBtn.addEventListener('click', ()=> sideMenu.classList.toggle('show'));
-    document.body.addEventListener('click', (e)=>{
-      if(!sideMenu.contains(e.target) && e.target !== menuBtn) sideMenu.classList.remove('show');
-    });
   </script>
-
 </body>
 </html>
