@@ -1,10 +1,10 @@
 /* ============================================================================
-   LLZ FIELD READING APP – FINAL FULL VERSION (WITH ALL FIXES)
+   LLZ FIELD READING APP – FINAL VERSION
    Includes:
-   ✔ NEXT bug fixed
-   ✔ Enter/Arrow quick navigation
-   ✔ Bigger input boxes + spacing + helper notes
-   ✔ TX1.png / TX2.png export (updated)
+   ✔ White background in exported PNG
+   ✔ TX1.png / TX2.png export
+   ✔ Navigation fixes (Enter/Arrow)
+   ✔ Wizard spacing + bigger boxes
    ✔ Graphs + Excel export
 ============================================================================ */
 
@@ -18,7 +18,6 @@ const ANGLES = [
 
 const STORAGE_KEY = "llz_v2_state";
 
-/* STATE */
 let state = {
   meta: {},
   values: {
@@ -28,7 +27,7 @@ let state = {
   current: { stage: "present", tx: null, idx: 0, direction: "neg2pos" }
 };
 
-/* -------------------- INITIAL SETUP -------------------- */
+/* ===================== INIT ARRAYS ======================= */
 function initArrays() {
   ["tx1", "tx2"].forEach(tx => {
     ["present", "reference"].forEach(st => {
@@ -38,23 +37,28 @@ function initArrays() {
 }
 initArrays();
 
-/* SAVE / LOAD */
+/* ===================== SAVE / LOAD ======================= */
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
+
 function loadState() {
   let raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return saveState();
+
   try {
     let s = JSON.parse(raw);
     state = Object.assign(state, s);
-  } catch { initArrays(); }
+  } catch {
+    initArrays();
+  }
 }
 loadState();
 
-/* Helper */
+/* SHORTHAND GET */
 function $(id) { return document.getElementById(id); }
 
+/* PAGE SWITCH */
 function showPage(id) {
   document.querySelectorAll(".page").forEach(p => p.classList.add("hidden"));
   $(id).classList.remove("hidden");
@@ -100,7 +104,7 @@ function buildMetaPage() {
 }
 
 /* ============================================================================
-   DASHBOARD PAGE
+   DASHBOARD
 ============================================================================ */
 function buildStagePage() {
   $("pageStage").innerHTML = `
@@ -111,18 +115,36 @@ function buildStagePage() {
         <button id="btnResults" class="btn">Graphs & Tables</button>
         <button id="btnSaved" class="btn">Saved Reports</button>
       </div>
+
       <div class="note">Station: ${state.meta.station || '-'} | Freq: ${state.meta.freq || '-'}</div>
     </div>
   `;
 
-  $("btnPresent").onclick = () => { state.current.stage = "present"; buildTxSelect(); showPage("pageTxSelect"); };
-  $("btnReference").onclick = () => { state.current.stage = "reference"; buildTxSelect(); showPage("pageTxSelect"); };
-  $("btnResults").onclick = () => { buildResultsPage(); showPage("pageResults"); };
-  $("btnSaved").onclick = () => { buildSavedPage(); showPage("pageSaved"); };
+  $("btnPresent").onclick = () => {
+    state.current.stage = "present";
+    buildTxSelect();
+    showPage("pageTxSelect");
+  };
+
+  $("btnReference").onclick = () => {
+    state.current.stage = "reference";
+    buildTxSelect();
+    showPage("pageTxSelect");
+  };
+
+  $("btnResults").onclick = () => {
+    buildResultsPage();
+    showPage("pageResults");
+  };
+
+  $("btnSaved").onclick = () => {
+    buildSavedPage();
+    showPage("pageSaved");
+  };
 }
 
 /* ============================================================================
-   TX SELECT PAGE
+   TX SELECT
 ============================================================================ */
 function buildTxSelect() {
   $("pageTxSelect").innerHTML = `
@@ -134,8 +156,17 @@ function buildTxSelect() {
     </div>
   `;
 
-  $("tx1Card").onclick = () => { state.current.tx = "tx1"; buildDirectionPage(); showPage("pageDirection"); };
-  $("tx2Card").onclick = () => { state.current.tx = "tx2"; buildDirectionPage(); showPage("pageDirection"); };
+  $("tx1Card").onclick = () => {
+    state.current.tx = "tx1";
+    buildDirectionPage();
+    showPage("pageDirection");
+  };
+
+  $("tx2Card").onclick = () => {
+    state.current.tx = "tx2";
+    buildDirectionPage();
+    showPage("pageDirection");
+  };
 }
 
 /* ============================================================================
@@ -169,7 +200,7 @@ function getOrderIndex(i) {
 }
 
 /* ============================================================================
-   WIZARD PAGE (DATA ENTRY WITH NAVIGATION)
+   WIZARD PAGE — DATA ENTRY WITH NAVIGATION
 ============================================================================ */
 
 function buildWizardPage() {
@@ -180,35 +211,30 @@ function buildWizardPage() {
 
   $("pageWizard").innerHTML = `
     <div class="card wizardBox" style="padding:20px">
-
       <h2>${state.current.tx.toUpperCase()} – ${state.current.stage.toUpperCase()}</h2>
       <div class="note" style="margin-bottom:18px;">Angle: <strong>${angle}°</strong></div>
 
-      <!-- DDM -->
       <div style="margin-bottom:22px;">
-        <label style="font-weight:600;">DDM</label><br>
+        <label>DDM</label><br>
         <input id="ddm" style="width:240px;padding:14px;font-size:20px;"
-          value="${saved.DDM !== null ? Math.abs(saved.DDM) : ''}">
-        <div class="note">Enter positive value — sign auto-applied.</div>
+               value="${saved.DDM !== null ? Math.abs(saved.DDM) : ''}">
+        <div class="note">Enter positive; sign applied automatically.</div>
       </div>
 
-      <!-- SDM -->
       <div style="margin-bottom:22px;">
-        <label style="font-weight:600;">SDM</label><br>
+        <label>SDM</label><br>
         <input id="sdm" style="width:240px;padding:14px;font-size:20px;"
-          value="${saved.SDM !== null ? Math.abs(saved.SDM) : ''}">
+               value="${saved.SDM !== null ? Math.abs(saved.SDM) : ''}">
       </div>
 
-      <!-- RF -->
       <div style="margin-bottom:22px;">
-        <label style="font-weight:600;">RF</label><br>
+        <label>RF</label><br>
         <input id="rf" style="width:240px;padding:14px;font-size:20px;"
-          value="${saved.RF !== null ? Math.abs(saved.RF) : ''}">
-        <div class="note">Enter positive value — stored as negative automatically.</div>
+               value="${saved.RF !== null ? Math.abs(saved.RF) : ''}">
+        <div class="note">Enter positive; stored as negative automatically.</div>
       </div>
 
-      <!-- QUICK NEXT -->
-      <button id="quickNext" class="btn primary" style="font-size:18px;">⮞ Next Angle</button>
+      <button id="quickNext" class="btn primary" style="font-size:18px;">⮞ NEXT ANGLE</button>
 
       <div class="actions" style="margin-top:20px;">
         <button id="wizPrev" class="btn">Prev</button>
@@ -216,11 +242,13 @@ function buildWizardPage() {
         <button id="wizNext" class="btn">Next</button>
         <button id="wizFinish" class="btn">Finish TX</button>
       </div>
-
     </div>
   `;
 
-  $("wizPrev").onclick = () => { if (idx > 0) { state.current.idx--; buildWizardPage(); } };
+  $("wizPrev").onclick = () => {
+    if (idx > 0) { state.current.idx--; buildWizardPage(); }
+  };
+
   $("wizSave").onclick = () => { saveWizard(); alert("Saved"); };
 
   $("wizNext").onclick = () => goNext();
@@ -228,7 +256,7 @@ function buildWizardPage() {
 
   $("wizFinish").onclick = () => { saveWizard(); showPage("pageStage"); };
 
-  /* ----- Key Navigation ----- */
+  /* NAVIGATION: ENTER, ARROW KEYS */
   const ddm = $("ddm"), sdm = $("sdm"), rf = $("rf");
 
   ddm.onkeydown = (e) => {
@@ -250,10 +278,7 @@ function buildWizardPage() {
   }
 }
 
-/* ============================================================================
-   SAVE WIZARD ENTRY
-============================================================================ */
-
+/* SAVE ENTRY */
 function saveWizard() {
   const idx = state.current.idx;
   const order = getOrderIndex(idx);
@@ -270,12 +295,7 @@ function saveWizard() {
   if (dd !== null) dd = angle < 0 ? -dd : dd;
   if (rf !== null) rf = -rf;
 
-  state.values[state.current.tx][state.current.stage][order] = {
-    DDM: dd,
-    SDM: sd,
-    RF: rf
-  };
-
+  state.values[state.current.tx][state.current.stage][order] = { DDM: dd, SDM: sd, RF: rf };
   saveState();
 }
 
@@ -304,8 +324,23 @@ function buildResultsPage() {
   $("btnExportExcel").onclick = exportExcel;
 }
 
-/* -------------------- CALCULATE -------------------- */
+/* ============================================================================
+   WHITE BACKGROUND FIX (PLUGIN)
+============================================================================ */
 
+const whiteBackgroundPlugin = {
+  id: 'whiteBackground',
+  beforeDraw(chart) {
+    const ctx = chart.canvas.getContext('2d');
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-over';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, chart.width, chart.height);
+    ctx.restore();
+  }
+};
+
+/* -------------------- CALCULATE -------------------- */
 function calculateAll() {
   let compiled = {};
 
@@ -325,10 +360,13 @@ function calculateAll() {
 }
 
 /* ============================================================================
-   GRAPH PLOTTING (TX1 / TX2) — UPDATED CANVAS IDs
+   GRAPH PLOTS (TX1 / TX2)
 ============================================================================ */
 
 function renderPlots(compiled) {
+
+  Chart.register(whiteBackgroundPlugin);
+
   $("plots").innerHTML = `
     <h3>TX1</h3>
     <div class="chartWrap"><canvas id="tx1Canvas" width="950" height="380"></canvas></div>
@@ -353,9 +391,8 @@ function renderPlots(compiled) {
     }
   };
 
-  const ds = (lbl, d, c) => ({
-    label: lbl, data: d,
-    borderColor: c, borderWidth: 2, tension: 0.15, pointRadius: 2
+  const ds = (label, data, color) => ({
+    label, data, borderColor: color, borderWidth: 2, tension: 0.15, pointRadius: 2
   });
 
   /* TX1 */
@@ -379,7 +416,7 @@ function renderPlots(compiled) {
   new Chart($("tx2Canvas").getContext("2d"), {
     type: "line",
     data: {
-      labels: ANGLES,
+      labels: ANGETERS,
       datasets: [
         ds("DDM REF", compiled.tx2.reference.ddm, "#4CAF50"),
         ds("DDM PRES", compiled.tx2.present.ddm, "#E53935"),
@@ -396,14 +433,12 @@ function renderPlots(compiled) {
 /* ============================================================================
    TABLE RENDERING
 ============================================================================ */
-
 function renderTables() {
   $("tables").innerHTML = "";
 
   ["tx1", "tx2"].forEach(tx => {
     let div = document.createElement("div");
     div.className = "tableCard";
-
     div.innerHTML = `<h4>${tx.toUpperCase()}</h4>`;
 
     let t = document.createElement("table");
@@ -433,9 +468,8 @@ function renderTables() {
 }
 
 /* ============================================================================
-   EXPORT IMAGES — UPDATED TO TX1.png / TX2.png
+   EXPORT IMAGES (TX1.png / TX2.png)
 ============================================================================ */
-
 function exportGraphImages() {
   const list = [
     { id: "tx1Canvas", name: "TX1.png" },
@@ -452,13 +486,12 @@ function exportGraphImages() {
     link.click();
   });
 
-  alert("Exported: TX1.png & TX2.png");
+  alert("Exported TX1.png & TX2.png");
 }
 
 /* ============================================================================
-   EXPORT EXCEL (CSV)
+   EXPORT EXCEL
 ============================================================================ */
-
 function exportExcel() {
   let csv = "";
 
@@ -489,9 +522,8 @@ function exportExcel() {
 }
 
 /* ============================================================================
-   SAVED REPORTS (UNCHANGED)
+   SAVED REPORTS
 ============================================================================ */
-
 function buildSavedPage() {
   $("pageSaved").innerHTML = `
     <div class="card"><h2>Saved Reports</h2>
@@ -531,8 +563,8 @@ function buildSavedPage() {
 
     div.querySelector("[data-del]").onclick = () => {
       if (confirm("Delete?")) {
-        let newList = reps.filter(x => x.id !== r.id);
-        localStorage.setItem("llz_reports_v2", JSON.stringify(newList));
+        let updated = reps.filter(x => x.id !== r.id);
+        localStorage.setItem("llz_reports_v2", JSON.stringify(updated));
         buildSavedPage();
       }
     };
@@ -540,9 +572,8 @@ function buildSavedPage() {
 }
 
 /* ============================================================================
-   INITIAL LOAD
+   INITIAL RUN
 ============================================================================ */
-
 document.addEventListener("DOMContentLoaded", () => {
   buildMetaPage();
   buildStagePage();
